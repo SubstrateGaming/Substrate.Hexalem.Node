@@ -16,7 +16,7 @@ members = [
 
 # General
 async-trait = { version = "0.1.73", default-features = false}
-clap        = { version = "4.4.6", default-features = false }
+clap        = { version = "4.4.12", default-features = false }
 futures     = { version = "0.3.28", default-features = false }
 hex-literal = { version = "0.4.1", default-features = false }
 hex         = { version = "0.4.3", default-features = false }
