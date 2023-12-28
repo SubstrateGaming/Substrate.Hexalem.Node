@@ -28,7 +28,7 @@ smallvec    = { version = "1.11.1", default-features = false }
 
 # Parity codec
 parity-scale-codec = { version = "3.0.0", default-features = false }
-scale-info         = { version = "2.1.1", default-features = false }
+scale-info         = { version = "2.10.0", default-features = false }
 
 # Substrate
 frame-benchmarking                         = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0", default-features = false }
