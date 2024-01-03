@@ -21,6 +21,17 @@ impl From<Position> for usize {
 	}
 }
 
+impl From<usize> for Position {
+	fn from(value: usize) -> Self {
+		match value {
+			0 => Position::One,
+			1 => Position::Two,
+			2 => Position::Three,
+			_ => Position::One,
+		}
+	}
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Encode, Decode, MaxEncodedLen, TypeInfo)]
 pub struct Coordinates {
 	row: Position,
@@ -30,6 +41,12 @@ pub struct Coordinates {
 impl From<Coordinates> for (usize, usize) {
 	fn from(value: Coordinates) -> Self {
 		(value.row.into(), value.col.into())
+	}
+}
+
+impl From<(usize, usize)> for Coordinates {
+	fn from(value: (usize, usize)) -> Self {
+		Self { row: Position::from(value.0), col: Position::from(value.1) }
 	}
 }
 
@@ -109,9 +126,9 @@ pub enum PlayResult<AccountId> {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Encode, Decode, MaxEncodedLen, TypeInfo)]
 pub struct Board<AccountId> {
-	cells: [[CellState; 3]; 3],
-	state: BoardState<AccountId>,
-	moves_played: u8,
+	pub(crate) cells: [[CellState; 3]; 3],
+	pub(crate) state: BoardState<AccountId>,
+	pub(crate) moves_played: u8,
 }
 
 impl<AccountId> Board<AccountId>

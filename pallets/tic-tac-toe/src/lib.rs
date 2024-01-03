@@ -17,7 +17,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(test)]
-mod tests;
+mod test;
 
 mod game;
 
@@ -106,8 +106,10 @@ pub mod pallet {
 			let game_id = Self::next_game_id();
 			let board = BoardOf::<T>::new(account.clone());
 
-			ActivePlayers::<T>::insert(account, game_id);
+			ActivePlayers::<T>::insert(account.clone(), game_id);
 			PendingGames::<T>::insert(game_id, board);
+
+			Self::deposit_event(Event::GameCreated { game_id, by: account });
 
 			Ok(())
 		}
@@ -130,7 +132,9 @@ pub mod pallet {
 
 			LastActiveGameId::<T>::set(game_id.saturating_add(1) % GameId::MAX);
 			ActiveGames::<T>::insert(game_id, game);
-			ActivePlayers::<T>::insert(account, game_id);
+			ActivePlayers::<T>::insert(account.clone(), game_id);
+
+			Self::deposit_event(Event::GameJoined { game_id, by: account });
 
 			Ok(())
 		}
@@ -144,41 +148,53 @@ pub mod pallet {
 			ensure!(maybe_game_id.is_some(), Error::<T>::PlayerNotActive);
 
 			let game_id = maybe_game_id.unwrap();
-			let mut game = ActiveGames::<T>::get(game_id).unwrap();
 
-			let results = game.play_turn(&account, at);
+			ActiveGames::<T>::mutate(game_id, |maybe_game| {
+				if let Some(ref mut game) = maybe_game {
+					let results = game.play_turn(&account, at);
 
-			match results {
-				PlayResult::Winner(acc) =>
-					if let BoardState::Finished(p1, p2) = game.get_state() {
-						Self::remove_game(game_id, p1, p2);
-						Self::deposit_event(Event::<T>::GameFinished {
-							game_id,
-							winner: Some(acc),
-						});
-						Ok(())
-					} else {
-						Self::clear_corrupt_game(game_id);
-						Err(Error::<T>::InvalidGameState.into())
-					},
-				PlayResult::Draw =>
-					if let BoardState::Finished(p1, p2) = game.get_state() {
-						Self::remove_game(game_id, p1, p2);
-						Self::deposit_event(Event::<T>::GameFinished { game_id, winner: None });
-						Ok(())
-					} else {
-						Self::clear_corrupt_game(game_id);
-						Err(Error::<T>::InvalidGameState.into())
-					},
-				PlayResult::InvalidTurn => Err(Error::<T>::InvalidTurn.into()),
-				PlayResult::InvalidCell => Err(Error::<T>::InvalidCell.into()),
-				PlayResult::GamePending => Err(Error::<T>::GamePending.into()),
-				PlayResult::GameAlreadyFinished => Err(Error::<T>::GameAlreadyFinished.into()),
-				PlayResult::Continue => {
-					Self::deposit_event(Event::<T>::MovePlayed { at, by: account });
-					Ok(())
-				},
-			}
+					match results {
+						PlayResult::Winner(acc) =>
+							if let BoardState::Finished(p1, p2) = game.get_state() {
+								Self::remove_players(p1, p2);
+								Self::deposit_event(Event::<T>::GameFinished {
+									game_id,
+									winner: Some(acc),
+								});
+								*maybe_game = None;
+								Ok(())
+							} else {
+								Self::clear_corrupt_game(game_id);
+								Err(Error::<T>::InvalidGameState.into())
+							},
+						PlayResult::Draw =>
+							if let BoardState::Finished(p1, p2) = game.get_state() {
+								Self::remove_players(p1, p2);
+								Self::deposit_event(Event::<T>::GameFinished {
+									game_id,
+									winner: None,
+								});
+								*maybe_game = None;
+								Ok(())
+							} else {
+								Self::clear_corrupt_game(game_id);
+								Err(Error::<T>::InvalidGameState.into())
+							},
+						PlayResult::InvalidTurn => Err(Error::<T>::InvalidTurn.into()),
+						PlayResult::InvalidCell => Err(Error::<T>::InvalidCell.into()),
+						PlayResult::GamePending => Err(Error::<T>::GamePending.into()),
+						PlayResult::GameAlreadyFinished =>
+							Err(Error::<T>::GameAlreadyFinished.into()),
+						PlayResult::Continue => {
+							Self::deposit_event(Event::<T>::MovePlayed { at, by: account });
+							Ok(())
+						},
+					}
+				} else {
+					Self::clear_corrupt_game(game_id);
+					Err(Error::<T>::InvalidGameState.into())
+				}
+			})
 		}
 	}
 
@@ -191,8 +207,7 @@ pub mod pallet {
 			next_game_id
 		}
 
-		fn remove_game(game_id: GameId, player_1: T::AccountId, player_2: T::AccountId) {
-			ActiveGames::<T>::remove(game_id);
+		fn remove_players( player_1: T::AccountId, player_2: T::AccountId) {
 			ActivePlayers::<T>::remove(player_1);
 			ActivePlayers::<T>::remove(player_2);
 		}

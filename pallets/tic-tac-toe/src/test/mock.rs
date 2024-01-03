@@ -93,7 +93,6 @@ impl pallet_tic_tac_toe::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 }
 
-#[derive(Default)]
 pub struct ExtBuilder;
 
 impl ExtBuilder {
