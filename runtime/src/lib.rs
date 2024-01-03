@@ -65,7 +65,7 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 /// Balance of an account.
 pub type Balance = u128;
 
-#[derive(Encode, Decode, Debug, TypeInfo, Copy, Clone, MaxEncodedLen, Eq, PartialEq)]
+#[derive(Encode, Decode, Default, Debug, TypeInfo, Copy, Clone, MaxEncodedLen, Eq, PartialEq)]
 pub struct HexalemTile(u8);
 
 impl GetTileInfo for HexalemTile {
@@ -98,12 +98,6 @@ impl HexalemTile {
 	pub fn new(tile_type: TileType, level: u8, pattern: TilePattern) -> Self {
 		let encoded = ((tile_type as u8) << 3) | ((level & 0x3) << 6) | (pattern as u8 & 0x7);
 		Self(encoded)
-	}
-}
-
-impl Default for HexalemTile {
-	fn default() -> Self {
-		Self(0) // Empty tile
 	}
 }
 
@@ -729,7 +723,8 @@ impl_runtime_apis! {
 		fn dispatch_benchmark(
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch, TrackedStorageKey};
+			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch};
+			use sp_storage::TrackedStorageKey;
 
 			use frame_system_benchmarking::Pallet as SystemBench;
 			use baseline::Pallet as BaselineBench;
