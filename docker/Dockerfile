@@ -15,8 +15,7 @@ FROM docker.io/library/ubuntu:22.04
 
 ARG bin
 
-COPY --from=builder /hexalem/target/release/${bin} /usr/local/bin/ajuna
-COPY --from=builder /hexalem/resources/ /
+COPY --from=builder /hexalem/target/release/${bin} /usr/local/bin/hexalem
 
 RUN useradd -m -u 1000 -U -s /bin/sh -d /hexalem hexalem && \
   mkdir -p /data /hexalem/.local/share && \
