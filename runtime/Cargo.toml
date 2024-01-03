@@ -52,6 +52,7 @@ pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 
 # Local Dependencies
 pallet-hexalem                             = { workspace = true }
+pallet-tic-tac-toe                         = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder                     = { workspace = true }

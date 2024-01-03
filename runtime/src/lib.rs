@@ -471,6 +471,10 @@ impl pallet_hexalem::Config for Runtime {
 	type TargetGoalHuman = HexalemTargetGoalHuman;
 }
 
+impl pallet_tic_tac_toe::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime {
@@ -481,6 +485,7 @@ construct_runtime!(
 		Balances: pallet_balances = 10,
 		TransactionPayment: pallet_transaction_payment = 11,
 		HexalemModule: pallet_hexalem = 21,
+		TicTacToe: pallet_tic_tac_toe = 22,
 		Aura: pallet_aura = 100,
 		Grandpa: pallet_grandpa = 101,
 	}
