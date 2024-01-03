@@ -1,15 +1,18 @@
 use crate as pallet_hexalem;
-use frame_support::{traits::{ConstU16, ConstU64}, parameter_types};
-use parity_scale_codec::{Encode, Decode, MaxEncodedLen};
+use frame_support::{
+	parameter_types,
+	traits::{ConstU16, ConstU64},
+};
+use pallet_hexalem::{
+	GetTileInfo, ResourceAmount, ResourceProductions, ResourceType, ResourceUnit, TileCost,
+	TilePattern, TileType, NUMBER_OF_RESOURCE_TYPES, NUMBER_OF_TILE_TYPES,
+};
+use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
-};
-use pallet_hexalem::{
-	GetTileInfo, ResourceAmount, ResourceProductions, ResourceType,
-	ResourceUnit, TileCost, TilePattern, TileType, NUMBER_OF_TILE_TYPES, NUMBER_OF_RESOURCE_TYPES,
 };
 
 type Block = frame_system::mocking::MockBlock<TestRuntime>;
@@ -26,17 +29,17 @@ impl GetTileInfo for HexalemTile {
 		(self.0 >> 6) & 0x3
 	}
 
-    fn set_level(&mut self, level: u8) {
-        self.0 = (self.0 & 0x3F) | (level << 6);
-    }
+	fn set_level(&mut self, level: u8) {
+		self.0 = (self.0 & 0x3F) | (level << 6);
+	}
 
 	fn get_pattern(&self) -> TilePattern {
 		TilePattern::from_u8(self.0 & 0x7)
 	}
 
-    fn set_pattern(&mut self, pattern: TilePattern) {
-        self.0 = (self.0 & 0xF8) | (pattern as u8);
-    }
+	fn set_pattern(&mut self, pattern: TilePattern) {
+		self.0 = (self.0 & 0xF8) | (pattern as u8);
+	}
 
 	fn get_home() -> Self {
 		Self(8) // Home level 0
@@ -44,10 +47,10 @@ impl GetTileInfo for HexalemTile {
 }
 
 impl HexalemTile {
-    pub fn new(tile_type: TileType, level: u8, pattern: TilePattern) -> Self {
-        let encoded = ((tile_type as u8) << 3) | ((level & 0x3) << 6) | (pattern as u8 & 0x7);
-        Self(encoded)
-    }
+	pub fn new(tile_type: TileType, level: u8, pattern: TilePattern) -> Self {
+		let encoded = ((tile_type as u8) << 3) | ((level & 0x3) << 6) | (pattern as u8 & 0x7);
+		Self(encoded)
+	}
 }
 
 impl Default for HexalemTile {
@@ -249,5 +252,8 @@ impl pallet_hexalem::Config for TestRuntime {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::<TestRuntime>::default().build_storage().unwrap().into()
+	frame_system::GenesisConfig::<TestRuntime>::default()
+		.build_storage()
+		.unwrap()
+		.into()
 }
