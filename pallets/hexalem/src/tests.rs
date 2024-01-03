@@ -1,7 +1,7 @@
 use crate::{
 	mock::{self, *},
-	pallet, Error, Event, GameProperties, GameState, GameStorage, GetTileInfo, HexBoardStorage,
-	HexGrid, Move, ResourceType, HexBoard,
+	pallet, Error, Event, GameProperties, GameState, GameStorage, GetTileInfo, HexBoard,
+	HexBoardStorage, HexGrid, Move, ResourceType,
 };
 use frame_support::{assert_noop, assert_ok};
 
@@ -238,7 +238,8 @@ fn test_resource_generation() {
 			HexalemTile(0),
 			HexalemTile(0),
 			HexalemTile(0),
-		].try_into()
+		]
+		.try_into()
 		.unwrap();
 
 		let hex_board_option: Option<HexBoard<TestRuntime>> =
@@ -248,14 +249,13 @@ fn test_resource_generation() {
 
 		let game_id = hex_board.game_id;
 
-		HexalemModule::set_hex_board(1, HexBoard {
-			game_id,
-			hex_grid: new_hex_grid,
-			resources: [0, 1, 0, 0, 0, 0, 0],
-		});
+		HexalemModule::set_hex_board(
+			1,
+			HexBoard { game_id, hex_grid: new_hex_grid, resources: [0, 1, 0, 0, 0, 0, 0] },
+		);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
-		
+
 		let hex_board_option: Option<HexBoard<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
@@ -296,7 +296,8 @@ fn test_saturate_99() {
 			HexalemTile(0),
 			HexalemTile(0),
 			HexalemTile(0),
-		].try_into()
+		]
+		.try_into()
 		.unwrap();
 
 		let hex_board_option: Option<HexBoard<TestRuntime>> =
@@ -306,14 +307,13 @@ fn test_saturate_99() {
 
 		let game_id = hex_board.game_id;
 
-		HexalemModule::set_hex_board(1, HexBoard {
-			game_id,
-			hex_grid: new_hex_grid,
-			resources: [99, 99, 99, 99, 99, 99, 99],
-		});
+		HexalemModule::set_hex_board(
+			1,
+			HexBoard { game_id, hex_grid: new_hex_grid, resources: [99, 99, 99, 99, 99, 99, 99] },
+		);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
-		
+
 		let hex_board_option: Option<HexBoard<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
