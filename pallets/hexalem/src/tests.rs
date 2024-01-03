@@ -72,7 +72,7 @@ fn create_new_game_successfully() {
 
 		assert_eq!(game.get_player_turn(), 0);
 
-		assert_eq!(game.get_played(), false);
+		assert!(!game.get_played());
 
 		assert_eq!(game.get_round(), 0);
 
@@ -139,7 +139,7 @@ fn create_new_game_successfully() {
 
 		assert_eq!(game.get_player_turn(), 0);
 
-		assert_eq!(game.get_played(), true);
+		assert!(game.get_played());
 
 		assert_eq!(game.get_round(), 0);
 
@@ -167,7 +167,7 @@ fn create_new_game_successfully() {
 
 		assert_eq!(game.get_player_turn(), 1);
 
-		assert_eq!(game.get_played(), false);
+		assert!(!game.get_played());
 
 		assert_eq!(game.get_round(), 0);
 

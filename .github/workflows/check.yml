@@ -44,7 +44,7 @@ jobs:
       - run: cargo clippy --all-features --all-targets ${{ env.CARGO_ARGS }} -- -D warnings
 
   test:
-    if: github.ref == 'refs/heads/master'
+    if: ${{ !startsWith(github.head_ref, 'release/') }}
     name: Test
     runs-on: ubuntu-latest
     continue-on-error: false

@@ -72,7 +72,7 @@ pub mod pallet {
 			((self.player_turn_and_played & 0x80) >> 7) == 1
 		}
 
-		fn set_played(&mut self, played: bool) -> () {
+		fn set_played(&mut self, played: bool) {
 			self.player_turn_and_played = (self.player_turn_and_played & 0x7F) | (played as u8) << 7
 		}
 
@@ -80,7 +80,7 @@ pub mod pallet {
 			self.selection_size
 		}
 
-		fn set_selection_size(&mut self, selection_size: u8) -> () {
+		fn set_selection_size(&mut self, selection_size: u8) {
 			self.selection_size = selection_size;
 		}
 
@@ -88,7 +88,7 @@ pub mod pallet {
 			self.round
 		}
 
-		fn set_round(&mut self, round: u8) -> () {
+		fn set_round(&mut self, round: u8) {
 			self.round = round;
 		}
 
@@ -96,7 +96,7 @@ pub mod pallet {
 			self.player_turn_and_played & 0x7F
 		}
 
-		fn set_player_turn(&mut self, turn: u8) -> () {
+		fn set_player_turn(&mut self, turn: u8) {
 			self.player_turn_and_played = (self.player_turn_and_played & 0x80) | turn;
 		}
 
@@ -108,7 +108,7 @@ pub mod pallet {
 			self.state
 		}
 
-		fn set_state(&mut self, state: GameState) -> () {
+		fn set_state(&mut self, state: GameState) {
 			self.state = state;
 		}
 	}
@@ -280,7 +280,7 @@ pub mod pallet {
 			self.tiles[tile_type_index]
 		}
 
-		pub fn set_tiles(&mut self, tile_type: TileType, value: u8) -> () {
+		pub fn set_tiles(&mut self, tile_type: TileType, value: u8) {
 			self.tiles[tile_type as usize] = value;
 		}
 
@@ -288,7 +288,7 @@ pub mod pallet {
 			self.levels[(tile_type as usize).saturating_mul(NUMBER_OF_LEVELS).saturating_add(level)]
 		}
 
-		pub fn set_levels(&mut self, tile_type: TileType, level: u8, value: u8) -> () {
+		pub fn set_levels(&mut self, tile_type: TileType, level: u8, value: u8) {
 			self.levels[(tile_type as usize)
 				.saturating_mul(NUMBER_OF_LEVELS)
 				.saturating_add(level as usize)] = value;
@@ -300,7 +300,7 @@ pub mod pallet {
 				.saturating_add(pattern as usize)]
 		}
 
-		pub fn set_patterns(&mut self, tile_type: TileType, pattern: TilePattern, value: u8) -> () {
+		pub fn set_patterns(&mut self, tile_type: TileType, pattern: TilePattern, value: u8) {
 			self.patterns[(tile_type as usize)
 				.saturating_mul(NUMBER_OF_PATTERNS)
 				.saturating_add(pattern as usize)] = value;
@@ -533,7 +533,7 @@ pub mod pallet {
 			let game_id: GameId = Blake2_256::hash(&(&who, &current_block_number).encode());
 
 			// Eensure that the game has not already been created
-			ensure!(!GameStorage::<T>::contains_key(&game_id), Error::<T>::GameAlreadyCreated);
+			ensure!(!GameStorage::<T>::contains_key(game_id), Error::<T>::GameAlreadyCreated);
 
 			// Default Game Config
 			let mut game = Game {
@@ -554,17 +554,13 @@ pub mod pallet {
 
 				HexBoardStorage::<T>::set(
 					player,
-					Some(HexBoard::<T>::new(grid_size as usize, game_id.clone())?),
+					Some(HexBoard::<T>::new(grid_size as usize, game_id)?),
 				);
 			}
 
 			GameStorage::<T>::set(game_id, Some(game));
 
-			Self::deposit_event(Event::GameCreated {
-				game_id: game_id.clone(),
-				grid_size,
-				players,
-			});
+			Self::deposit_event(Event::GameCreated { game_id, grid_size, players });
 
 			Ok(())
 		}
@@ -580,10 +576,10 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id.clone();
+			let game_id: GameId = hex_board.game_id;
 
 			// Ensures that the Game exists
-			let mut game = match GameStorage::<T>::get(&game_id) {
+			let mut game = match GameStorage::<T>::get(game_id) {
 				Some(value) => value,
 				None => return Err(Error::<T>::GameNotInitialized.into()),
 			};
@@ -637,14 +633,11 @@ pub mod pallet {
 
 			neighbours.push(Some((tile_q, tile_r)));
 
-			for option_tile in neighbours {
-				match option_tile {
-					Some((q, r)) => Self::set_patterns(&mut hex_board, (q, r))?,
-					None => (),
-				}
+			for (q, r) in neighbours.into_iter().flatten() {
+				Self::set_patterns(&mut hex_board, (q, r))?
 			}
 
-			GameStorage::<T>::set(&game_id, Some(game));
+			GameStorage::<T>::set(game_id, Some(game));
 			HexBoardStorage::<T>::set(&who, Some(hex_board));
 
 			Self::deposit_event(Event::MovePlayed { game_id, player: who, move_played });
@@ -663,10 +656,10 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id.clone();
+			let game_id: GameId = hex_board.game_id;
 
 			// Ensures that the Game exists
-			let game = match GameStorage::<T>::get(&game_id) {
+			let game = match GameStorage::<T>::get(game_id) {
 				Some(value) => value,
 				None => return Err(Error::<T>::GameNotInitialized.into()),
 			};
@@ -711,10 +704,10 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id.clone();
+			let game_id: GameId = hex_board.game_id;
 
 			// Ensures that the Game exists
-			let mut game = match GameStorage::<T>::get(&game_id) {
+			let mut game = match GameStorage::<T>::get(game_id) {
 				Some(value) => value,
 				None => return Err(Error::<T>::GameNotInitialized.into()),
 			};
@@ -748,7 +741,7 @@ pub mod pallet {
 
 			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
 
-			GameStorage::<T>::set(&game_id, Some(game));
+			GameStorage::<T>::set(game_id, Some(game));
 
 			Self::deposit_event(Event::NewTurn { game_id, next_player });
 
@@ -762,7 +755,7 @@ pub mod pallet {
 		pub fn force_finish_turn(origin: OriginFor<T>, game_id: GameId) -> DispatchResult {
 			let who: T::AccountId = ensure_signed(origin)?;
 
-			let mut game = match GameStorage::<T>::get(&game_id) {
+			let mut game = match GameStorage::<T>::get(game_id) {
 				Some(value) => value,
 				None => return Err(Error::<T>::GameNotInitialized.into()),
 			};
@@ -789,7 +782,7 @@ pub mod pallet {
 
 			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
 
-			GameStorage::<T>::set(&game_id, Some(game));
+			GameStorage::<T>::set(game_id, Some(game));
 
 			Self::deposit_event(Event::NewTurn { game_id, next_player });
 
@@ -810,7 +803,7 @@ pub mod pallet {
 			ensure_root(origin)?;
 
 			// Ensures that the Game exists
-			let game = match GameStorage::<T>::get(&game_id) {
+			let game = match GameStorage::<T>::get(game_id) {
 				Some(value) => value,
 				None => return Err(Error::<T>::GameNotInitialized.into()),
 			};
@@ -819,7 +812,7 @@ pub mod pallet {
 				HexBoardStorage::<T>::remove(player);
 			}
 
-			GameStorage::<T>::remove(&game_id);
+			GameStorage::<T>::remove(game_id);
 
 			Ok(())
 		}
@@ -842,7 +835,7 @@ impl<T: Config> Pallet<T> {
 
 		for i in 0..game.get_selection_size() {
 			new_selection.push(
-				selection_base[((i + offset) % 32) as usize].clone() %
+				selection_base[((i + offset) % 32) as usize] %
 					T::TileCosts::get().len().saturated_into::<u8>(),
 			);
 		}
@@ -879,7 +872,7 @@ impl<T: Config> Pallet<T> {
 
 			for i in selection_len..game.get_selection_size() as usize {
 				new_selection.push(
-					selection_base[(i + offset) % 32].clone() %
+					selection_base[(i + offset) % 32] %
 						T::TileCosts::get().len().saturated_into::<u8>(),
 				);
 			}
@@ -978,18 +971,11 @@ impl<T: Config> Pallet<T> {
 			&tile_coords.1,
 		)];
 
-		for neighbour in
-			Self::get_neighbouring_tiles(&max_distance, &tile_coords.0, &tile_coords.1)?
+		for (q, r) in Self::get_neighbouring_tiles(&max_distance, &tile_coords.0, &tile_coords.1)?
+			.into_iter()
+			.flatten()
 		{
-			match neighbour {
-				Some(value) => impact_tiles.push(Self::coords_to_index(
-					&max_distance,
-					&side_length,
-					&value.0,
-					&value.1,
-				)),
-				None => (),
-			};
+			impact_tiles.push(Self::coords_to_index(&max_distance, &side_length, &q, &r));
 		}
 
 		for index in impact_tiles {
@@ -1025,7 +1011,7 @@ impl<T: Config> Pallet<T> {
 			match neighbour {
 				Some(value) => {
 					let neighbour_index: u8 =
-						Self::coords_to_index(&max_distance, &side_length, &value.0, &value.1)
+						Self::coords_to_index(max_distance, side_length, &value.0, &value.1)
 							.saturated_into();
 					n.push(Some((neighbour_index, hex_board.hex_grid[neighbour_index as usize])));
 				},
@@ -1035,73 +1021,58 @@ impl<T: Config> Pallet<T> {
 
 		let pattern = Self::get_pattern(n);
 
-		match pattern {
-			Some((p, indexes)) =>
-				for i in indexes {
-					hex_board.hex_grid[i as usize].set_pattern(p);
-				},
-			None => (),
+		if let Some((p, indexes)) = pattern {
+			for i in indexes {
+				hex_board.hex_grid[i as usize].set_pattern(p);
+			}
 		}
 		Ok(())
 	}
 
 	fn get_pattern(n: Vec<Option<(u8, T::Tile)>>) -> Option<(TilePattern, Vec<u8>)> {
-		match n[0] {
-			Some((_i, tile)) =>
-				if tile.get_type() == TileType::Empty {
-					return None
-				},
-			None => (),
+		if let Some((_i, tile)) = n[0] {
+			if tile.get_type() == TileType::Empty {
+				return None
+			}
 		};
 
 		// Delta
-		match Self::match_same_tile(n[0], n[1], n[2]) {
-			Some(v) => return Some((TilePattern::Delta, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[1], n[2]) {
+			return Some((TilePattern::Delta, v))
 		};
-		match Self::match_same_tile(n[0], n[2], n[3]) {
-			Some(v) => return Some((TilePattern::Delta, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[2], n[3]) {
+			return Some((TilePattern::Delta, v))
 		};
-		match Self::match_same_tile(n[0], n[3], n[4]) {
-			Some(v) => return Some((TilePattern::Delta, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[3], n[4]) {
+			return Some((TilePattern::Delta, v))
 		};
-		match Self::match_same_tile(n[0], n[4], n[5]) {
-			Some(v) => return Some((TilePattern::Delta, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[4], n[5]) {
+			return Some((TilePattern::Delta, v))
 		};
-		match Self::match_same_tile(n[0], n[5], n[6]) {
-			Some(v) => return Some((TilePattern::Delta, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[5], n[6]) {
+			return Some((TilePattern::Delta, v))
 		};
-		match Self::match_same_tile(n[0], n[6], n[1]) {
-			Some(v) => return Some((TilePattern::Delta, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[6], n[1]) {
+			return Some((TilePattern::Delta, v))
 		};
 
 		// Line
-		match Self::match_same_tile(n[0], n[1], n[4]) {
-			Some(v) => return Some((TilePattern::Line, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[1], n[4]) {
+			return Some((TilePattern::Line, v))
 		};
-		match Self::match_same_tile(n[0], n[2], n[5]) {
-			Some(v) => return Some((TilePattern::Line, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[2], n[5]) {
+			return Some((TilePattern::Line, v))
 		};
-		match Self::match_same_tile(n[0], n[3], n[6]) {
-			Some(v) => return Some((TilePattern::Line, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile(n[0], n[3], n[6]) {
+			return Some((TilePattern::Line, v))
 		};
 
 		// ypsilon
-		match Self::match_same_tile_4(n[0], n[1], n[3], n[5]) {
-			Some(v) => return Some((TilePattern::Line, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile_4(n[0], n[1], n[3], n[5]) {
+			return Some((TilePattern::Line, v))
 		};
-		match Self::match_same_tile_4(n[0], n[2], n[4], n[6]) {
-			Some(v) => return Some((TilePattern::Line, v)),
-			None => (),
+		if let Some(v) = Self::match_same_tile_4(n[0], n[2], n[4], n[6]) {
+			return Some((TilePattern::Line, v))
 		};
 
 		None
@@ -1153,7 +1124,7 @@ impl<T: Config> Pallet<T> {
 		hex_board: &mut HexBoard<T>,
 		resource_productions: &ResourceProductions,
 		multiplier: u8,
-	) -> () {
+	) {
 		for resource_type_index in 0..NUMBER_OF_RESOURCE_TYPES {
 			match (
 				resource_productions.produces[resource_type_index],
@@ -1176,7 +1147,7 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
-	fn evaluate_board(hex_board: &mut HexBoard<T>) -> () {
+	fn evaluate_board(hex_board: &mut HexBoard<T>) {
 		let board_stats: BoardStats = hex_board.get_stats();
 
 		hex_board.resources[ResourceType::Mana as usize] = Self::saturate_at_99(
@@ -1209,10 +1180,12 @@ impl<T: Config> Pallet<T> {
 
 		let tile_resource_productions = T::TileResourceProductions::get();
 
-		for tile_type_index in 0..NUMBER_OF_TILE_TYPES {
+		for (tile_type_index, resource_productions) in
+			tile_resource_productions.iter().enumerate().take(NUMBER_OF_TILE_TYPES)
+		{
 			Self::produce(
 				hex_board,
-				&tile_resource_productions[tile_type_index],
+				resource_productions,
 				board_stats.get_tiles_by_tile_index(tile_type_index),
 			);
 		}
@@ -1235,7 +1208,7 @@ impl<T: Config> Pallet<T> {
 		for neighbour in neighbours {
 			match neighbour {
 				Some((q, r)) =>
-					if hex_grid[Self::coords_to_index(max_distance, side_length, &q, &r) as usize]
+					if hex_grid[Self::coords_to_index(max_distance, side_length, q, r) as usize]
 						.get_type() != TileType::Empty
 					{
 						return true
@@ -1260,7 +1233,7 @@ impl<T: Config> Pallet<T> {
 			let neighbour_q = q.checked_add(q_direction).ok_or(Error::<T>::MathOverflow)?;
 			let neighbout_r = r.checked_add(r_direction).ok_or(Error::<T>::MathOverflow)?;
 
-			if Self::is_valid_hex(&max_distance, &neighbour_q, &neighbout_r) {
+			if Self::is_valid_hex(max_distance, &neighbour_q, &neighbout_r) {
 				neigbouring_tiles.push(Some((neighbour_q, neighbout_r)));
 			} else {
 				neigbouring_tiles.push(None)
@@ -1309,10 +1282,7 @@ impl<T: Config> Pallet<T> {
 
 	/// Helper method that tells you if the board size is valid
 	fn is_valid_grid_size(size: u8) -> bool {
-		match size {
-			9 | 25 | 49 => true,
-			_ => false,
-		}
+		matches!(size, 9 | 25 | 49)
 	}
 
 	fn saturate_at_99(x: u8) -> u8 {
@@ -1330,12 +1300,12 @@ impl<T: Config> Pallet<T> {
 // Custom trait for Tile definition
 pub trait GetTileInfo {
 	fn get_level(&self) -> u8;
-	fn set_level(&mut self, level: u8) -> ();
+	fn set_level(&mut self, level: u8);
 
 	fn get_type(&self) -> TileType;
 
 	fn get_pattern(&self) -> TilePattern;
-	fn set_pattern(&mut self, value: TilePattern) -> ();
+	fn set_pattern(&mut self, value: TilePattern);
 
 	fn same(&self, other: &Self) -> bool {
 		self.get_type() == other.get_type()
@@ -1348,23 +1318,23 @@ trait GameProperties<T: Config> {
 	// Player made a move
 	// It is used for determining whether to generate a new selection
 	fn get_played(&self) -> bool;
-	fn set_played(&mut self, played: bool) -> ();
+	fn set_played(&mut self, played: bool);
 
 	fn get_round(&self) -> u8;
-	fn set_round(&mut self, round: u8) -> ();
+	fn set_round(&mut self, round: u8);
 
 	fn get_player_turn(&self) -> u8;
-	fn set_player_turn(&mut self, turn: u8) -> ();
+	fn set_player_turn(&mut self, turn: u8);
 
 	fn get_state(&self) -> GameState;
-	fn set_state(&mut self, state: GameState) -> ();
+	fn set_state(&mut self, state: GameState);
 
 	fn borrow_players(&self) -> &Players<T>;
 
 	fn get_selection_size(&self) -> u8;
-	fn set_selection_size(&mut self, selection_size: u8) -> ();
+	fn set_selection_size(&mut self, selection_size: u8);
 
-	fn next_turn(&mut self) -> () {
+	fn next_turn(&mut self) {
 		let player_turn = self.get_player_turn();
 
 		let next_player_turn =

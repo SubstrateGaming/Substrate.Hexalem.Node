@@ -17,7 +17,7 @@ use sp_runtime::{
 
 type Block = frame_system::mocking::MockBlock<TestRuntime>;
 
-#[derive(Encode, Decode, Debug, TypeInfo, Copy, Clone, MaxEncodedLen, Eq, PartialEq)]
+#[derive(Encode, Decode, Default, Debug, TypeInfo, Copy, Clone, MaxEncodedLen, Eq, PartialEq)]
 pub struct HexalemTile(pub u8);
 
 impl GetTileInfo for HexalemTile {
@@ -50,12 +50,6 @@ impl HexalemTile {
 	pub fn new(tile_type: TileType, level: u8, pattern: TilePattern) -> Self {
 		let encoded = ((tile_type as u8) << 3) | ((level & 0x3) << 6) | (pattern as u8 & 0x7);
 		Self(encoded)
-	}
-}
-
-impl Default for HexalemTile {
-	fn default() -> Self {
-		Self(0) // Empty tile
 	}
 }
 
