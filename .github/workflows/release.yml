@@ -1,155 +1,176 @@
-# This is an example GitHub action that will build and publish the binaries and a Docker image
-# You need to add the following secrets to your GitHub Repository or Organization to make this work
-# - DOCKERHUB_USERNAME: The username of the DockerHub account. E.g. parity
-# - DOCKERHUB_TOKEN: Access token for DockerHub, see https://docs.docker.com/docker-hub/access-tokens/.
-# The following is set up as an environment variable below
-# - DOCKER_REPO: The unique name of the DockerHub repository. E.g. parity/polkadot
-
 name: Release
 
-permissions:
-  contents: read
-
-# Controls when the action will run.
 on:
   push:
-    # Triggers the workflow on tag push events
+    branches:
+      - release/[0-9]+.[0-9]+.[0-9]+
     tags:
-      - v[0-9]+.*
+      - v[0-9]+.[0-9]+.[0-9]+
 
 env:
-  RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: 0
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
-  CARGO_NET_RETRY: 10
-  RUSTFLAGS: -D warnings
-  RUSTUP_MAX_RETRIES: 10
   CARGO_TERM_COLOR: always
-  # Set an environment variable (that can be overriden) for the Docker Repo
-  DOCKER_REPO: tripleight/hexalem
-
-defaults:
-  run:
-    shell: bash
-
 
 jobs:
-  create-release:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-      - uses: taiki-e/create-gh-release-action@v1
-        with:
-          title: $version
-          branch: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  upload-assets:
-    name: ${{ matrix.target }}
-    needs:
-      - create-release
+  release-check:
+    if: startsWith(github.ref, 'refs/heads/release')
+    name: Check for release
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        # The list of architechture and OS to build for
-        # You can add or remove targets here if you want
-        #
-        # When updating this list, remember to update the target list in tests too
-        include:
-          # - target: aarch64-unknown-linux-gnu
-          - target: x86_64-unknown-linux-gnu
-          - target: aarch64-apple-darwin
-            os: macos-11
-          - target: x86_64-apple-darwin
-            os: macos-11
-          # - target: universal-apple-darwin
-          #   os: macos-11
-
-    # The type of runner that the job will run on
-    # Runs on Ubuntu if other os is not specified above
-    runs-on: ${{ matrix.os || 'ubuntu-22.04' }}
-    timeout-minutes: 90
-    permissions:
-      contents: write
+        runtime: [hexalem]
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
         with:
-          persist-credentials: false
+          fetch-depth: 0
 
-      - name: Install Rust
+      - name: Get crate and release versions
         run: |
-          rustup update stable --no-self-update
-          rustup target add wasm32-unknown-unknown
+          echo "CRATE_VERSIONS=$(cargo tree --depth=0 --workspace | egrep -o '[0-9]+\.[0-9]+\.[0-9]+' | uniq)" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${GITHUB_REF_NAME#release/}" >> $GITHUB_ENV
 
-      - name: Install linux dependencies
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
+      - name: Check release version is bumped
         run: |
-          sudo apt-get -qq update
-          sudo apt-get install -y protobuf-compiler
+          [ -z "$(git tag --list)" ] && {
+            echo "skipping as there are no tags yet"
+            exit 0
+          }
 
-      - name: Install mac dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: brew install protobuf
-      - uses: taiki-e/setup-cross-toolchain-action@v1
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
-        with:
-          target: ${{ matrix.target }}
+          TAG=$(git describe --tags --abbrev=0 | tr -d v)
+          echo "previous release version: $TAG"
+          echo "current release version: ${{ env.RELEASE_VERSION }}"
+          [ $TAG -eq ${{ env.RELEASE_VERSION }} ] && {
+            echo "release version must be bumped"
+            exit 1
+          }
+          exit 0
 
-      # Build and upload the binary to the new release
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: hexalem
-          target: ${{ matrix.target }}
-          tar: all
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check crate and release versions match
+        run: |
+          [ $(echo ${{ env.CRATE_VERSIONS }} | wc -w | xargs) -ne 1 ] && {
+            echo "all crate versions should be equal"
+            exit 1
+          }
+          [ "${{ env.CRATE_VERSIONS }}" != "${{ env.RELEASE_VERSION }}" ] && {
+            echo "release version (${{ env.CRATE_VERSIONS }}) is not equal to crate versions (${{ env.CRATE_VERSIONS }})"
+            exit 1
+          }
+          echo "crate version: ${{ env.CRATE_VERSIONS }}"
+          echo "release version: ${{ env.RELEASE_VERSION }}"
+          exit 0
 
-      - name: Upload x86_64 linux binary to workflow
-        if: (matrix.target == 'x86_64-unknown-linux-gnu')
-        uses: actions/upload-artifact@v3
-        with:
-          name: hexalem
-          path: ${{ github.workspace }}/target/x86_64-unknown-linux-gnu/release/hexalem
+      - name: Check spec version match
+        run: |
+          RELEASE_VERSION=$(echo ${{ env.RELEASE_VERSION }} | tr -d .)
+          RELEASE_VERSION_INTEGER=$((10#$RELEASE_VERSION))
+          SPEC_VERSION=$(grep "spec_version" runtime/${{ matrix.runtime }}/**/lib.rs | egrep -o "[0-9]+")
 
-  build-image:
-    # The type of runner that the job will run on
-    needs:
-      - upload-assets
-    runs-on: ubuntu-22.04
-    # Steps represent a sequence of tasks that will be executed as part of the job
+          echo "release version as integer: $RELEASE_VERSION_INTEGER"
+          echo "spec version: $SPEC_VERSION"
+
+          [ "$RELEASE_VERSION_INTEGER" != "$SPEC_VERSION" ] && {
+            echo "spec version doesn't match release version"
+            exit 1
+          }
+          exit 0
+      - run: sudo apt-get install -y protobuf-compiler
+      - name: Check wasm build
+        run: cargo check --all-features --all-targets --release -p ${{ matrix.runtime }}-runtime
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runtime: [hexalem]
+    env:
+      SUBWASM_VERSION: v0.19.1
     steps:
-      # Login to Docker hub using the credentials stored in the repository secrets
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2.1.0
+      - uses: actions/checkout@v3
+      - id: srtool_build
+        uses: chevdor/srtool-actions@v0.7.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
-      # Download the binary from the previous job
-      - name: Download x86_64 linux binary
-        uses: actions/download-artifact@v3
+          image: paritytech/srtool
+          chain: ${{ matrix.runtime }}
+          tag: 1.70.0
+      - name: Install subwasm {{ env.SUBWASM_VERSION }}
+        run: |
+          wget https://github.com/chevdor/subwasm/releases/download/${{ env.SUBWASM_VERSION }}/subwasm_linux_amd64_${{ env.SUBWASM_VERSION }}.deb -O subwasm.deb
+          sudo dpkg -i subwasm.deb
+      - name: Run subwasm info
+        run: |
+          echo "\`\`\`" > ${{ matrix.runtime }}-info.txt
+          echo -e "${{ matrix.runtime }}-runtime:\n" >> ${{ matrix.runtime }}-info.txt
+          subwasm info ${{ steps.srtool_build.outputs.wasm_compressed }} \
+            | sed -E 's/^Running subwasm.+$//' \
+            | sed '/^$/d' \
+            >> ${{ matrix.runtime }}-info.txt
+          echo "\`\`\`" >> ${{ matrix.runtime }}-info.txt
+      - uses: actions/upload-artifact@v3
         with:
-          name: hexalem
-          path: ${{ github.workspace }}
+          name: ${{ matrix.runtime }}-artifact
+          path: |
+            ${{ steps.srtool_build.outputs.wasm_compressed }}
+            ${{ matrix.runtime }}-info.txt
+          if-no-files-found: error
 
-      # Build and push 2 images, One with the version tag and the other with latest tag
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v4
+  release-draft:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+      - run: |
+          echo "## Subwasm Info" > runtime-info.txt
+          cat **/*-info.txt >> runtime-info.txt
+          echo "---" >> runtime-info.txt
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          generate_release_notes: true
+          append_body: true
+          body_path: runtime-info.txt
+          files: "**/*_runtime.compact.compressed.wasm"
+
+  release-docker:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - {
+            name: hexalem-node,
+            build_arg_feature: default,
+            build_arg_bin: hexalem,
+          }
+    outputs:
+      image_tag: ${{ steps.set_image_tag.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      - uses: docker/metadata-action@v4
+        id: meta
+        with:
+          images: ${{ matrix.image.name }}
+      - name: Get image tag from the tag name
+        id: set_image_tag
+        run: |
+          IMAGE_TAG="${GITHUB_REF#refs/tags/v}"
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+      - uses: docker/build-push-action@v3
         with:
           context: .
-          file: ./Containerfile
+          file: docker/Dockerfile
           push: true
-          build-args: |
-            DOCKER_REPO=${{ env.DOCKER_REPO }}
           tags: |
-            ${{ env.DOCKER_REPO }}:${{ github.ref_name }}
-            ${{ env.DOCKER_REPO }}:latest
+            substrategaming/${{ matrix.image.name }}:${{ env.image_tag }}
+            substrategaming/${{ matrix.image.name }}:latest
+          build-args: |
+            features=${{ matrix.image.build_arg_feature }}
+            bin=${{ matrix.image.build_arg_bin }}
+          cache-from: type=registry,ref=substrategaming/${{ matrix.image.name }}:buildcache
+          cache-to: type=registry,ref=substrategaming/${{ matrix.image.name }}:buildcache,mode=max
