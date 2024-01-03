@@ -207,7 +207,7 @@ pub mod pallet {
 			next_game_id
 		}
 
-		fn remove_players( player_1: T::AccountId, player_2: T::AccountId) {
+		fn remove_players(player_1: T::AccountId, player_2: T::AccountId) {
 			ActivePlayers::<T>::remove(player_1);
 			ActivePlayers::<T>::remove(player_2);
 		}

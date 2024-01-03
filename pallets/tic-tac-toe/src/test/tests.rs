@@ -221,18 +221,12 @@ mod play {
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((0, 0))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((0, 2))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((0, 2))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((1, 0))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((0, 1))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((0, 1))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((2, 0))
@@ -269,26 +263,17 @@ mod play {
 				RuntimeOrigin::signed(CHARLIE),
 				Coordinates::from((2, 0))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((0, 0))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((0, 0))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(CHARLIE),
 				Coordinates::from((2, 1))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((1, 1))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((1, 1))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(CHARLIE),
 				Coordinates::from((0, 2))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((2, 2))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((2, 2))));
 
 			System::assert_last_event(RuntimeEvent::TicTacToe(crate::Event::GameFinished {
 				game_id,
@@ -321,34 +306,22 @@ mod play {
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((0, 0))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((0, 1))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((0, 1))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((0, 2))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((1, 0))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((1, 0))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((1, 2))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((1, 1))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((1, 1))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((2, 0))
 			));
-			assert_ok!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((2, 2))
-			));
+			assert_ok!(TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((2, 2))));
 			assert_ok!(TicTacToe::play_move(
 				RuntimeOrigin::signed(ALICE),
 				Coordinates::from((2, 1))
@@ -381,10 +354,10 @@ mod play {
 
 			run_to_block(2);
 
-			assert_noop!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((2, 0))
-			), Error::<Test>::InvalidTurn);
+			assert_noop!(
+				TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((2, 0))),
+				Error::<Test>::InvalidTurn
+			);
 		});
 	}
 
@@ -408,10 +381,10 @@ mod play {
 				Coordinates::from((2, 0))
 			));
 
-			assert_noop!(TicTacToe::play_move(
-				RuntimeOrigin::signed(BOB),
-				Coordinates::from((2, 0))
-			), Error::<Test>::InvalidCell);
+			assert_noop!(
+				TicTacToe::play_move(RuntimeOrigin::signed(BOB), Coordinates::from((2, 0))),
+				Error::<Test>::InvalidCell
+			);
 		});
 	}
 }

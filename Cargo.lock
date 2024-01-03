@@ -2767,6 +2767,7 @@ dependencies = [
  "pallet-grandpa",
  "pallet-hexalem",
  "pallet-sudo",
+ "pallet-tic-tac-toe",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",

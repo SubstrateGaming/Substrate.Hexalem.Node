@@ -111,6 +111,7 @@ try-runtime-cli                            = { git = "https://github.com/parityt
 
 # Substrate Gaming Pallets
 pallet-hexalem                            = { path = "pallets/hexalem", default-features = false }
+pallet-tic-tac-toe                        = { path = "pallets/tic-tac-toe", default-features = false }
 
 # Substrate Gaming Runtime
 hexalem-runtime                     = { path = "runtime" }
