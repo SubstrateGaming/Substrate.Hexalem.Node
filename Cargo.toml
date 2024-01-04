@@ -3,7 +3,7 @@ authors    = [ "Substrate Gaming <https://github.com/SubstrateGaming>" ]
 edition    = "2021"
 homepage   = "https://github.com/SubstrateGaming"
 repository = "https://github.com/SubstrateGaming"
-version    = "4.0.0-dev"
+version    = "0.1.0"
 
 [workspace]
 members = [

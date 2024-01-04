@@ -62,7 +62,7 @@ jobs:
         run: |
           RELEASE_VERSION=$(echo ${{ env.RELEASE_VERSION }} | tr -d .)
           RELEASE_VERSION_INTEGER=$((10#$RELEASE_VERSION))
-          SPEC_VERSION=$(grep "spec_version" runtime/${{ matrix.runtime }}/**/lib.rs | egrep -o "[0-9]+")
+          SPEC_VERSION=$(grep "spec_version" runtime/**/lib.rs | egrep -o "[0-9]+")
 
           echo "release version as integer: $RELEASE_VERSION_INTEGER"
           echo "spec version: $SPEC_VERSION"
