@@ -22,7 +22,7 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /hexalem hexalem && \
   chown -R hexalem:hexalem /data  && \
   ln -s /data /hexalem/.local/share/hexalem && \
   rm -rf /usr/sbin && \
-  ajuna --version
+  hexalem --version
 
 USER hexalem
 
