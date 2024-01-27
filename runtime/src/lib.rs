@@ -19,7 +19,7 @@ use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, Get, IdentifyAccount, NumberFor, One, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
@@ -65,12 +65,12 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 /// Balance of an account.
 pub type Balance = u128;
 
-#[derive(Encode, Decode, Default, Debug, TypeInfo, Copy, Clone, MaxEncodedLen, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Encode, Decode, TypeInfo, MaxEncodedLen)]
 pub struct HexalemTile(u8);
 
 impl GetTileInfo for HexalemTile {
 	fn get_type(&self) -> TileType {
-		TileType::from_u8((self.0 >> 3) & 0x7)
+		TileType::from((self.0 >> 3) & 0x7)
 	}
 
 	fn get_level(&self) -> u8 {
@@ -82,7 +82,7 @@ impl GetTileInfo for HexalemTile {
 	}
 
 	fn get_pattern(&self) -> TilePattern {
-		TilePattern::from_u8(self.0 & 0x7)
+		TilePattern::from(self.0 & 0x7)
 	}
 
 	fn set_pattern(&mut self, pattern: TilePattern) {
@@ -143,7 +143,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
 	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 	//   the compatible custom types.
-	spec_version: 10,
+	spec_version: 100,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -296,17 +296,26 @@ impl pallet_balances::Config for Runtime {
 	type MaxHolds = ();
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+pub struct ParameterGet<const N: u32>;
+
+impl<const N: u32> Get<u32> for ParameterGet<N> {
+	fn get() -> u32 {
+		N
+	}
+}
+
+pub type HexalemMaxPlayers = ParameterGet<100>;
+pub type HexalemMaxHexGridSize = ParameterGet<49>;
+pub type HexalemMaxTileSelection = ParameterGet<16>;
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 
-	pub const HexalemMaxPlayers: u8 = 100;
 	pub const HexalemMinPlayers: u8 = 1;
 	pub const HexalemMaxRounds: u8 = 25;
 
 	pub const HexalemBlocksToPlayLimit: u8 = 10;
-
-	pub const HexalemMaxHexGridSize: u8 = 25;
-	pub const HexalemMaxTileSelection: u8 = 16;
 
 	pub const HexalemTileResourceProductions: [ResourceProductions; NUMBER_OF_TILE_TYPES] = [
 		// Empty
@@ -351,7 +360,7 @@ parameter_types! {
 		},
 	];
 
-	pub const HexalemTileCosts: [TileCost<Runtime>; 15] = [
+	pub const HexalemTileCosts: [TileCost<HexalemTile>; 15] = [
 		// tile_to_buy: HexalemTile(16), // Grass, level 0
 		// tile_to_buy: HexalemTile(24), // Water, level 0
 		// tile_to_buy: HexalemTile(32), // Mountain, level 0
@@ -746,9 +755,6 @@ impl_runtime_apis! {
 	#[cfg(feature = "try-runtime")]
 	impl frame_try_runtime::TryRuntime<Block> for Runtime {
 		fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
-			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
-			// have a backtrace here. If any of the pre/post migration checks fail, we shall stop
-			// right here and right now.
 			let weight = Executive::try_runtime_upgrade(checks).unwrap();
 			(weight, BlockWeights::get().max_block)
 		}
@@ -757,11 +763,11 @@ impl_runtime_apis! {
 			block: Block,
 			state_root_check: bool,
 			signature_check: bool,
-			select: frame_try_runtime::TryStateSelect
+			select: frame_try_runtime::TryStateSelect,
 		) -> Weight {
 			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
 			// have a backtrace here.
-			Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
+			Executive::try_execute_block(block, state_root_check, signature_check, select).unwrap()
 		}
 	}
 }

@@ -1,7 +1,7 @@
 use crate as pallet_hexalem;
 use frame_support::{
 	parameter_types,
-	traits::{ConstU16, ConstU64},
+	traits::{ConstU16, ConstU64, Get},
 };
 use pallet_hexalem::{
 	GetTileInfo, ResourceAmount, ResourceProductions, ResourceType, ResourceUnit, TileCost,
@@ -17,14 +17,10 @@ use sp_runtime::{
 
 type Block = frame_system::mocking::MockBlock<TestRuntime>;
 
-#[derive(Encode, Decode, Default, Debug, TypeInfo, Copy, Clone, MaxEncodedLen, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Encode, Decode, TypeInfo, MaxEncodedLen)]
 pub struct HexalemTile(pub u8);
 
 impl GetTileInfo for HexalemTile {
-	fn get_type(&self) -> TileType {
-		TileType::from_u8((self.0 >> 3) & 0x7)
-	}
-
 	fn get_level(&self) -> u8 {
 		(self.0 >> 6) & 0x3
 	}
@@ -33,8 +29,12 @@ impl GetTileInfo for HexalemTile {
 		self.0 = (self.0 & 0x3F) | (level << 6);
 	}
 
+	fn get_type(&self) -> TileType {
+		TileType::from((self.0 >> 3) & 0x7)
+	}
+
 	fn get_pattern(&self) -> TilePattern {
-		TilePattern::from_u8(self.0 & 0x7)
+		TilePattern::from(self.0 & 0x7)
 	}
 
 	fn set_pattern(&mut self, pattern: TilePattern) {
@@ -53,15 +53,24 @@ impl HexalemTile {
 	}
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+pub struct ParameterGet<const N: u32>;
+
+impl<const N: u32> Get<u32> for ParameterGet<N> {
+	fn get() -> u32 {
+		N
+	}
+}
+
+pub type HexalemMaxPlayers = ParameterGet<100>;
+pub type HexalemMaxHexGridSize = ParameterGet<49>;
+pub type HexalemMaxTileSelection = ParameterGet<16>;
+
 parameter_types! {
-	pub const HexalemMaxPlayers: u8 = 100;
 	pub const HexalemMinPlayers: u8 = 1;
 	pub const HexalemMaxRounds: u8 = 25;
 
 	pub const HexalemBlocksToPlayLimit: u8 = 10;
-
-	pub const HexalemMaxHexGridSize: u8 = 25;
-	pub const HexalemMaxTileSelection: u8 = 16;
 
 	pub const HexalemTileResourceProductions: [ResourceProductions; NUMBER_OF_TILE_TYPES] = [
 		// Empty
@@ -106,7 +115,7 @@ parameter_types! {
 		},
 	];
 
-	pub const HexalemTileCosts: [TileCost<TestRuntime>; 15] = [
+	pub const HexalemTileCosts: [TileCost<HexalemTile>; 15] = [
 		// tile_to_buy: HexalemTile(16), // Grass, level 0
 		// tile_to_buy: HexalemTile(24), // Water, level 0
 		// tile_to_buy: HexalemTile(32), // Mountain, level 0
