@@ -2766,6 +2766,7 @@ dependencies = [
  "pallet-balances",
  "pallet-grandpa",
  "pallet-hexalem",
+ "pallet-matchmaker",
  "pallet-sudo",
  "pallet-timestamp",
  "pallet-transaction-payment",
@@ -4646,6 +4647,21 @@ dependencies = [
  "frame-system",
  "hex",
  "log",
+ "pallet-matchmaker",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-matchmaker"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
  "parity-scale-codec",
  "scale-info",
  "sp-core",

@@ -9,6 +9,7 @@ version    = "0.1.0"
 members = [
     "node",
     "pallets/hexalem",
+    "pallets/matchmaker",
     "runtime",
 ]
 resolver = "2"
@@ -111,6 +112,7 @@ try-runtime-cli                            = { git = "https://github.com/parityt
 
 # Substrate Gaming Pallets
 pallet-hexalem                            = { path = "pallets/hexalem", default-features = false }
+pallet-matchmaker                         = { path = "pallets/matchmaker", default-features = false }
 
 # Substrate Gaming Runtime
 hexalem-runtime                     = { path = "runtime" }

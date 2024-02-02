@@ -1,6 +1,6 @@
 [package]
-name = "pallet-hexalem"
-description = "Hexalem game pallet"
+name = "pallet-matchmaker"
+description = "Ajuna Network pallet matchmaker for creating matches between players."
 
 authors.workspace    = true
 edition.workspace    = true
@@ -12,9 +12,6 @@ version.workspace    = true
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-# General (wasm)
-log = { workspace = true }
-hex = { workspace = true, features = ["alloc"] }
 
 # Substrate (wasm)
 frame-support      = { workspace = true }
@@ -23,9 +20,6 @@ parity-scale-codec = { workspace = true, features = [ "derive", "max-encoded-len
 scale-info         = { workspace = true, features = [ "derive" ] }
 sp-std             = { workspace = true }
 sp-runtime         = { workspace = true }
-
-# external pallets
-pallet-matchmaker  = { workspace = true }
 
 [dev-dependencies]
 sp-core = { workspace = true }
