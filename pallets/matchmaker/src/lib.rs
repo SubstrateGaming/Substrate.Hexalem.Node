@@ -132,6 +132,9 @@ pub mod pallet {
 		/// Queue is empty.
 		QueueIsEmpty,
 	}
+	
+	#[pallet::call]
+	impl<T: Config> Pallet<T> { }
 }
 
 impl<T: Config> Pallet<T> {

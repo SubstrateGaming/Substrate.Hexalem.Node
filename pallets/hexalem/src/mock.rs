@@ -203,8 +203,22 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		HexalemModule: pallet_hexalem,
+		MatchmakerModule: pallet_matchmaker,
 	}
 );
+
+// matchmaker parameters
+parameter_types! {
+    pub const AmountPlayers: u8 = 2;
+    pub const AmountBrackets: u8 = 2;
+}
+
+/// pallet used for matchmaking in pallet-rps.
+impl pallet_matchmaker::Config for TestRuntime {
+    type RuntimeEvent = RuntimeEvent;
+    type AmountPlayers = AmountPlayers;
+    type AmountBrackets = AmountBrackets;
+}
 
 impl frame_system::Config for TestRuntime {
 	type BaseCallFilter = frame_support::traits::Everything;
@@ -251,6 +265,7 @@ impl pallet_hexalem::Config for TestRuntime {
 	type DefaultPlayerResources = HexalemDefaultPlayerResources;
 	type TargetGoalGold = HexalemTargetGoalGold;
 	type TargetGoalHuman = HexalemTargetGoalHuman;
+	type Matchmaker = MatchmakerModule;
 }
 
 // Build genesis storage according to the mock runtime.

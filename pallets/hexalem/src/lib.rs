@@ -27,6 +27,8 @@ use frame_support::{
 };
 use scale_info::prelude::vec;
 
+use pallet_matchmaker::MatchFunc;
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -114,6 +116,8 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type TargetGoalHuman: Get<ResourceUnit>;
+
+		type Matchmaker: MatchFunc<Self::AccountId>;
 	}
 
 	#[pallet::storage]
