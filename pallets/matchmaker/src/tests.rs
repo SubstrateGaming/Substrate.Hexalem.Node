@@ -1,4 +1,4 @@
-use crate::mock::*;
+use crate::{mock::*, Error};
 
 #[test]
 fn test_is_queued() {
@@ -7,7 +7,7 @@ fn test_is_queued() {
 
 		assert_eq!(MatchMaker::do_queue_size(0), 0);
 		assert_eq!(MatchMaker::do_is_queued(player1), false);
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), true);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Ok(()));
 		assert_eq!(MatchMaker::do_is_queued(player1), true);
 		MatchMaker::do_empty_queue(0);
 		assert_eq!(MatchMaker::do_is_queued(player1), false);
@@ -21,17 +21,17 @@ fn test_try_duplicate_queue() {
 		let player2 = 2;
 
 		assert_eq!(MatchMaker::do_queue_size(0), 0);
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), true);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Ok(()));
 		// try same bracket
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), false);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Err(Error::<TestRuntime>::AlreadyQueued.into()));
 		// try other bracket
-		assert_eq!(MatchMaker::do_add_queue(player1, 1), false);
+		assert_eq!(MatchMaker::do_add_queue(player1, 1), Err(Error::<TestRuntime>::AlreadyQueued.into()));
 
-		assert_eq!(MatchMaker::do_add_queue(player2, 1), true);
+		assert_eq!(MatchMaker::do_add_queue(player2, 1), Ok(()));
 		// try same bracket
-		assert_eq!(MatchMaker::do_add_queue(player2, 1), false);
+		assert_eq!(MatchMaker::do_add_queue(player2, 1), Err(Error::<TestRuntime>::AlreadyQueued.into()));
 		// try other bracket
-		assert_eq!(MatchMaker::do_add_queue(player2, 0), false);
+		assert_eq!(MatchMaker::do_add_queue(player2, 0), Err(Error::<TestRuntime>::AlreadyQueued.into()));
 	});
 }
 
@@ -43,17 +43,17 @@ fn test_add_queue() {
 
 		assert_eq!(MatchMaker::do_queue_size(0), 0);
 		assert_eq!(MatchMaker::do_try_match().is_empty(), true);
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), true);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Ok(()));
 		assert_eq!(MatchMaker::do_queue_size(0), 1);
 		assert_eq!(MatchMaker::do_try_match().is_empty(), true);
-		assert_eq!(MatchMaker::do_add_queue(player2, 0), true);
+		assert_eq!(MatchMaker::do_add_queue(player2, 0), Ok(()));
 		assert_eq!(MatchMaker::do_queue_size(0), 2);
 		assert_eq!(MatchMaker::do_try_match(), [1, 2]);
 		assert_eq!(MatchMaker::do_queue_size(0), 0);
 		assert_eq!(MatchMaker::do_try_match().is_empty(), true);
 
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), true);
-		assert_eq!(MatchMaker::do_add_queue(player2, 0), true);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(player2, 0), Ok(()));
 		assert_eq!(MatchMaker::do_queue_size(0), 2);
 		MatchMaker::do_empty_queue(0);
 		assert_eq!(MatchMaker::do_try_match().is_empty(), true);
@@ -80,22 +80,22 @@ fn test_brackets() {
 
 		assert_eq!(MatchMaker::do_queue_size(0), 0);
 		assert_eq!(MatchMaker::do_all_queue_size(), 0);
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), true);
-		assert_eq!(MatchMaker::do_add_queue(player2, 0), true);
-		assert_eq!(MatchMaker::do_add_queue(player3, 0), true);
-		assert_eq!(MatchMaker::do_add_queue(player4, 1), true);
-		assert_eq!(MatchMaker::do_add_queue(player5, 1), true);
-		assert_eq!(MatchMaker::do_add_queue(player6, 2), true);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(player2, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(player3, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(player4, 1), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(player5, 1), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(player6, 2), Ok(()));
 		assert_eq!(MatchMaker::do_queue_size(0), 3);
 		assert_eq!(MatchMaker::do_queue_size(1), 2);
 		assert_eq!(MatchMaker::do_queue_size(2), 1);
 		assert_eq!(MatchMaker::do_all_queue_size(), 6);
 		assert_eq!(MatchMaker::do_try_match(), [1, 2]);
 		assert_eq!(MatchMaker::do_try_match(), [3, 4]);
-		assert_eq!(MatchMaker::do_add_queue(player1, 0), true);
+		assert_eq!(MatchMaker::do_add_queue(player1, 0), Ok(()));
 		assert_eq!(MatchMaker::do_try_match(), [1, 5]);
 		assert_eq!(MatchMaker::do_try_match().is_empty(), true);
-		assert_eq!(MatchMaker::do_add_queue(player5, 1), true);
+		assert_eq!(MatchMaker::do_add_queue(player5, 1), Ok(()));
 		assert_eq!(MatchMaker::do_try_match(), [5, 6]);
 	});
 }

@@ -3,6 +3,7 @@
 use core::cmp;
 
 use crate::vec::Vec;
+use frame_system::pallet_prelude::BlockNumberFor;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/reference/frame-pallets/>
@@ -181,6 +182,9 @@ pub mod pallet {
 		// HexBoard has not been initialized yet. Unable to play.
 		HexBoardNotInitialized,
 
+		// HexBoard state is set to Matchmaking
+		HexBoardInMatchmakingState,
+
 		// Creator needs to be included among players at index 0
 		CreatorNotInPlayersAtIndexZero,
 
@@ -277,22 +281,10 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let game_id: GameId = Blake2_256::hash(&(&who, &current_block_number).encode());
 
+			ensure!(players[0] == who, Error::<T>::CreatorNotInPlayersAtIndexZero);
+
 			// Ensure that the game has not already been created
 			ensure!(!GameStorage::<T>::contains_key(&game_id), Error::<T>::GameAlreadyCreated);
-
-			// Default Game Config
-			let mut game = Game {
-				state: GameState::Playing,
-				selection_size: 2,
-				round: 0,
-				max_rounds: T::MaxRounds::get(),
-				player_turn_and_played: 0,
-				last_played_block: current_block_number,
-				players: players.clone().try_into().map_err(|_| Error::<T>::InternalError)?,
-				selection: Default::default(),
-			};
-
-			Self::new_selection(&mut game, game_id)?;
 
 			// Initialise HexBoards for all players
 			for player in &players {
@@ -303,18 +295,84 @@ pub mod pallet {
 					Some(
 						HexBoardOf::<T>::try_new::<T::DefaultPlayerResources>(
 							grid_size as usize,
-							game_id,
+							MatchmakingState::Joined(game_id),
 						)
 						.ok_or(Error::<T>::InternalError)?,
 					),
 				);
 			}
 
-			ensure!(players[0] == who, Error::<T>::CreatorNotInPlayersAtIndexZero);
+			// Default Game Config
+			Self::do_create_new_game(game_id, current_block_number, players, grid_size)
+		}
 
-			GameStorage::<T>::set(game_id, Some(game));
+		#[pallet::call_index(100)]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
+		pub fn queue(origin: OriginFor<T>) -> DispatchResult {
+			let who: AccountIdOf<T> = ensure_signed(origin)?;
 
-			Self::deposit_event(Event::GameCreated { game_id, grid_size, players });
+			// Make sure player has no board open.
+			ensure!(!HexBoardStorage::<T>::contains_key(&who), Error::<T>::AlreadyPlaying);
+
+			// Perhaps in the future, we might want to allow players to play on other grid sizes
+			let grid_size: u8 = 25;
+
+			HexBoardStorage::<T>::set(
+				&who,
+				Some(
+					HexBoardOf::<T>::try_new::<T::DefaultPlayerResources>(
+						grid_size as usize,
+						MatchmakingState::Matchmaking,
+					)
+					.ok_or(Error::<T>::InternalError)?,
+				),
+			);
+
+			// This might change with the introduction of ELO
+			let bracket: u8 = 0;
+
+			// Add player to queue, duplicate check is done in matchmaker.
+			T::Matchmaker::add_queue(who, bracket)?;
+
+			let potential_players = T::Matchmaker::try_match();
+
+			// if result is not empty we have a valid match
+			if !potential_players.is_empty() {
+				// Random GameId
+				// I used `potential_players` to ensure that even if 2 independent players wanted to
+				// create game in the same block, they would be able to.
+				let current_block_number = <frame_system::Pallet<T>>::block_number();
+				let game_id: GameId =
+					Blake2_256::hash(&(&potential_players[0], &current_block_number).encode());
+
+				for player in &potential_players {
+
+					// Ensures that the HexBoard exists
+					let mut hex_board = match HexBoardStorage::<T>::get(&player) {
+						Some(value) => value,
+						None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+					};
+
+					hex_board.matchmaking_state = MatchmakingState::Joined(game_id);
+					
+					HexBoardStorage::<T>::set(
+						player,
+						Some(
+							hex_board
+						),
+					);
+				}
+
+				// Create new game
+				Self::do_create_new_game(
+					game_id,
+					current_block_number,
+					potential_players,
+					grid_size,
+				)?;
+
+				// Maybe adjust the weight
+			}
 
 			Ok(())
 		}
@@ -330,7 +388,8 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id;
+			let game_id: GameId =
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
 
 			// Ensures that the Game exists
 			let mut game = match GameStorage::<T>::get(game_id) {
@@ -410,7 +469,8 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id;
+			let game_id: GameId =
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
 
 			// Ensures that the Game exists
 			let game = match GameStorage::<T>::get(game_id) {
@@ -458,7 +518,8 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id;
+			let game_id: GameId =
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
 
 			// Ensures that the Game exists
 			let mut game = match GameStorage::<T>::get(game_id) {
@@ -595,6 +656,34 @@ pub mod pallet {
 
 // Other helper methods
 impl<T: Config> Pallet<T> {
+	/// Instancializes a new Game
+	fn do_create_new_game(
+		game_id: GameId,
+		current_block_number: BlockNumberFor<T>,
+		players: Vec<AccountIdOf<T>>,
+		grid_size: u8,
+	) -> Result<(), sp_runtime::DispatchError> {
+		// Default Game Config
+		let mut game = Game {
+			state: GameState::Playing,
+			selection_size: 2,
+			round: 0,
+			max_rounds: T::MaxRounds::get(),
+			player_turn_and_played: 0,
+			last_played_block: current_block_number,
+			players: players.clone().try_into().map_err(|_| Error::<T>::InternalError)?,
+			selection: Default::default(),
+		};
+
+		Self::new_selection(&mut game, game_id)?;
+
+		GameStorage::<T>::set(game_id, Some(game));
+
+		Self::deposit_event(Event::GameCreated { game_id, grid_size, players });
+
+		Ok(())
+	}
+
 	/// Helper method that generates a completely new selection from the selection_base
 	fn new_selection(
 		game: &mut GameOf<T>,

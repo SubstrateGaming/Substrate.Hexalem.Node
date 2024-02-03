@@ -52,7 +52,7 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-		/// Constant that indicates how many players are need to create a new match.
+		/// Constant that indicates how many players are needed to create a new match.
 		#[pallet::constant]
 		type AmountPlayers: Get<u8>;
 
@@ -131,8 +131,10 @@ pub mod pallet {
 		QueueSizeToLow,
 		/// Queue is empty.
 		QueueIsEmpty,
+		/// Player has already queued, can not queue twice
+		AlreadyQueued
 	}
-	
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> { }
 }
@@ -153,12 +155,27 @@ impl<T: Config> Pallet<T> {
 		>::new())
 	}
 
-	fn do_add_queue(account: T::AccountId, bracket: u8) -> bool {
+	fn do_add_queue(account: T::AccountId, bracket: u8) -> Result<(), sp_runtime::DispatchError> {
 		let mut queue = Self::queue_transient();
 
 		let player = PlayerStruct { account };
 		// duplicate check if we can add key to the queue
 		if !queue.push(bracket, player.account.clone(), player.clone()) {
+			return Err(Error::<T>::AlreadyQueued.into());
+		}
+
+		Self::deposit_event(Event::Queued(player));
+		
+		Ok(())
+	}
+
+	fn do_remove_queue(account: T::AccountId) -> bool {
+		let bracket = 1;
+		let mut queue = Self::queue_transient();
+
+		let player = PlayerStruct { account };
+		// duplicate check if we can add key to the queue
+		if !queue.remove(bracket, player.account.clone(), player.clone()) {
 			return false;
 		}
 
@@ -250,8 +267,12 @@ impl<T: Config> MatchFunc<T::AccountId> for Pallet<T> {
 		Self::do_all_empty_queue();
 	}
 
-	fn add_queue(account: T::AccountId, bracket: u8) -> bool {
+	fn add_queue(account: T::AccountId, bracket: u8) -> Result<(), sp_runtime::DispatchError> {
 		Self::do_add_queue(account, bracket)
+	}
+
+	fn remove_queue(account: T::AccountId) -> bool {
+		Self::do_remove_queue(account)
 	}
 
 	fn try_match() -> Vec<T::AccountId> {
@@ -279,7 +300,9 @@ pub trait MatchFunc<AccountId> {
 	fn all_empty_queue();
 
 	/// return true if adding account to bracket queue was successful
-	fn add_queue(account: AccountId, bracket: u8) -> bool;
+	fn add_queue(account: AccountId, bracket: u8) -> Result<(), sp_runtime::DispatchError>;
+
+	fn remove_queue(account: AccountId) -> bool;
 
 	/// try create a match
 	fn try_match() -> Vec<AccountId>;
