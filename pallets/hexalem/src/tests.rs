@@ -6,7 +6,6 @@ fn game_loop() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		// Dispatch a signed extrinsic.
 
 		let players = vec![1, 2, 3];
 
@@ -951,5 +950,30 @@ fn simple_2p_matchmaking() {
 		assert_eq!(game.get_selection_size(), 2);
 
 		assert_eq!(game.get_state(), GameState::Playing);
+
+		assert_noop!(
+			HexalemModule::queue(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::AlreadyPlaying
+		);
+
+		assert_noop!(
+			HexalemModule::queue(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::AlreadyPlaying
+		);
+	});
+}
+
+#[test]
+fn queue(){
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(1)));
+
+		assert_noop!(
+			HexalemModule::queue(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::AlreadyPlaying
+		);
 	});
 }

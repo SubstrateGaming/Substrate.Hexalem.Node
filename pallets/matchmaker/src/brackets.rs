@@ -26,8 +26,6 @@ where
 	fn commit(&self);
 	/// Push an item onto the end of the queue.
 	fn push(&mut self, b: Bracket, j: ItemKey, i: Item) -> bool;
-    /// Remove an item from the queue
-    fn remove(&mut self, b: Bracket, j: ItemKey, i: Item) -> bool;
 	/// Pop an item from the start of the queue.
 	///
 	/// Returns `None` if the queue is empty.
@@ -156,37 +154,6 @@ where
 		// ensure that the key is not queued
 		for i in 0..self.index_vector.len() {
 			if N::contains_key(i as Bracket, &item_key) {
-				return false;
-			}
-		}
-
-		// insert the item key and the item
-		N::insert(bracket, &item_key, item);
-		M::insert(bracket, v_end, item_key);
-
-		// this will intentionally overflow and wrap around when bonds_end
-		// reaches `Index::max_value` because we want a brackets.
-		let next_index = v_end.wrapping_add(1 as u16);
-		if next_index == v_start {
-			// queue presents as empty but is not
-			// --> overwrite the oldest item in the FIFO brackets
-			v_start = v_start.wrapping_add(1 as u16);
-		}
-		v_end = next_index;
-
-		self.index_vector[bracket as usize] = (v_start, v_end);
-		true
-	}
-
-    /// Remove an item from the queue.
-	///
-	/// Will remove the item, but will not update the bounds in storage.
-	fn remove(&mut self, bracket: Bracket, item_key: ItemKey, item: Item) -> bool {
-		let (mut v_start, mut v_end) = self.index_vector[bracket as usize];
-
-		// ensure that the key is queued
-		for i in 0..self.index_vector.len() {
-			if !N::contains_key(i as Bracket, &item_key) {
 				return false;
 			}
 		}

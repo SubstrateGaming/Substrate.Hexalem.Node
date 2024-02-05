@@ -127,12 +127,8 @@ pub mod pallet {
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Queue size is to low.
-		QueueSizeToLow,
-		/// Queue is empty.
-		QueueIsEmpty,
 		/// Player has already queued, can not queue twice
-		AlreadyQueued
+		AlreadyQueued,
 	}
 
 	#[pallet::call]
@@ -167,20 +163,6 @@ impl<T: Config> Pallet<T> {
 		Self::deposit_event(Event::Queued(player));
 		
 		Ok(())
-	}
-
-	fn do_remove_queue(account: T::AccountId) -> bool {
-		let bracket = 1;
-		let mut queue = Self::queue_transient();
-
-		let player = PlayerStruct { account };
-		// duplicate check if we can add key to the queue
-		if !queue.remove(bracket, player.account.clone(), player.clone()) {
-			return false;
-		}
-
-		Self::deposit_event(Event::Queued(player));
-		true
 	}
 
 	fn do_empty_queue(bracket: u8) {
@@ -271,10 +253,6 @@ impl<T: Config> MatchFunc<T::AccountId> for Pallet<T> {
 		Self::do_add_queue(account, bracket)
 	}
 
-	fn remove_queue(account: T::AccountId) -> bool {
-		Self::do_remove_queue(account)
-	}
-
 	fn try_match() -> Vec<T::AccountId> {
 		Self::do_try_match()
 	}
@@ -301,8 +279,6 @@ pub trait MatchFunc<AccountId> {
 
 	/// return true if adding account to bracket queue was successful
 	fn add_queue(account: AccountId, bracket: u8) -> Result<(), sp_runtime::DispatchError>;
-
-	fn remove_queue(account: AccountId) -> bool;
 
 	/// try create a match
 	fn try_match() -> Vec<AccountId>;
