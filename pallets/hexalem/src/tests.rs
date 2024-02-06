@@ -1,5 +1,7 @@
 use crate::{mock::*, types::*, *};
 use frame_support::{assert_noop, assert_ok};
+use crate::Event;
+use pallet_elo::Event as EloEvent;
 
 #[test]
 fn game_loop() {
@@ -964,7 +966,7 @@ fn simple_2p_matchmaking() {
 }
 
 #[test]
-fn queue(){
+fn queue_edgecases(){
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
@@ -975,5 +977,161 @@ fn queue(){
 			HexalemModule::queue(RuntimeOrigin::signed(1)),
 			Error::<TestRuntime>::AlreadyPlaying
 		);
+	});
+}
+
+#[test]
+fn elo_2p_match() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let players = vec![1, 2];
+
+		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), players.clone(), 25));
+
+		let new_hex_grid: HexGridOf<TestRuntime> = vec![
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile::new(TileType::Home, 3, TilePattern::Normal),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+		]
+		.try_into()
+		.unwrap();
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(1);
+
+		let mut hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
+
+		hex_board.resources = [99; NUMBER_OF_RESOURCE_TYPES];
+
+		hex_board.hex_grid = new_hex_grid;
+
+		// Set player resources to 99 and set a new hex_grid
+		HexalemModule::set_hex_board(
+			1,
+			hex_board,
+		);
+
+		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
+
+		System::assert_has_event(
+			Event::GameFinished { game_id }.into(),
+		);
+
+		System::assert_has_event(
+			EloEvent::RatingGained { player: 1, new_rating: 1016, rating_gained: 16 }.into(),
+		);
+    
+        System::assert_has_event(
+			EloEvent::RatingLost { player: 2, new_rating: 984, rating_lost: 16 }.into(),
+		);
+
+		assert_eq!(EloModule::get_rating(&1), 1016);
+		assert_eq!(EloModule::get_rating(&2), 984);
+	});
+}
+
+#[test]
+fn elo_4p_match() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let players = vec![1, 2, 3, 4];
+
+		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), players.clone(), 25));
+
+		let new_hex_grid: HexGridOf<TestRuntime> = vec![
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile::new(TileType::Home, 3, TilePattern::Normal),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+		]
+		.try_into()
+		.unwrap();
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(1);
+
+		let mut hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
+
+		hex_board.resources = [99; NUMBER_OF_RESOURCE_TYPES];
+
+		hex_board.hex_grid = new_hex_grid;
+
+		// Set player resources to 99 and set a new hex_grid
+		HexalemModule::set_hex_board(
+			1,
+			hex_board,
+		);
+
+		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
+
+		System::assert_has_event(
+			Event::GameFinished { game_id }.into(),
+		);
+		System::assert_has_event(
+			EloEvent::RatingGained { player: 1, new_rating: 1048, rating_gained: 48 }.into(),
+		);
+        System::assert_has_event(
+			EloEvent::RatingLost { player: 2, new_rating: 984, rating_lost: 16 }.into(),
+		);
+		System::assert_has_event(
+			EloEvent::RatingLost { player: 3, new_rating: 984, rating_lost: 16 }.into(),
+		);
+		System::assert_has_event(
+			EloEvent::RatingLost { player: 4, new_rating: 984, rating_lost: 16 }.into(),
+		);
+
+		assert_eq!(EloModule::get_rating(&1), 1048);
+		assert_eq!(EloModule::get_rating(&2), 984);
+		assert_eq!(EloModule::get_rating(&3), 984);
+		assert_eq!(EloModule::get_rating(&4), 984);
 	});
 }

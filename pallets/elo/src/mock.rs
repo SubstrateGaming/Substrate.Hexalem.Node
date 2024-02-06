@@ -2,7 +2,9 @@ use crate as pallet_elo;
 use frame_support::{
 	traits::{ConstU16, ConstU64},
 };
-use sp_core::H256;
+use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
+use sp_core::{Get, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
@@ -45,8 +47,20 @@ impl frame_system::Config for TestRuntime {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+pub struct ParameterGet<const N: u32>;
+
+impl<const N: u32> Get<u32> for ParameterGet<N> {
+	fn get() -> u32 {
+		N
+	}
+}
+
+pub type MaxPlayers = ParameterGet<100>;
+
 impl pallet_elo::Config for TestRuntime {
 	type RuntimeEvent = RuntimeEvent;
+	type MaxPlayers = MaxPlayers;
 }
 
 // Build genesis storage according to the mock runtime.

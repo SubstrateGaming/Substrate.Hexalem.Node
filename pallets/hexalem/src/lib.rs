@@ -28,6 +28,7 @@ use frame_support::{
 };
 use scale_info::prelude::vec;
 
+use pallet_elo::EloFunc;
 use pallet_matchmaker::MatchFunc;
 
 #[frame_support::pallet]
@@ -119,6 +120,8 @@ pub mod pallet {
 		type TargetGoalHuman: Get<ResourceUnit>;
 
 		type Matchmaker: MatchFunc<Self::AccountId>;
+
+		type Elo: EloFunc<Self::AccountId, Self::MaxPlayers>;
 	}
 
 	#[pallet::storage]
@@ -346,7 +349,6 @@ pub mod pallet {
 					Blake2_256::hash(&(&potential_players[0], &current_block_number).encode());
 
 				for player in &potential_players {
-
 					// Ensures that the HexBoard exists
 					let mut hex_board = match HexBoardStorage::<T>::get(&player) {
 						Some(value) => value,
@@ -354,13 +356,8 @@ pub mod pallet {
 					};
 
 					hex_board.matchmaking_state = MatchmakingState::Joined(game_id);
-					
-					HexBoardStorage::<T>::set(
-						player,
-						Some(
-							hex_board
-						),
-					);
+
+					HexBoardStorage::<T>::set(player, Some(hex_board));
 				}
 
 				// Create new game
@@ -544,21 +541,62 @@ pub mod pallet {
 				Self::new_selection(&mut game, game_id)?;
 			}
 
-			// Updating the resources
+			// Update the resources
 			Self::evaluate_board(&mut hex_board);
 
 			if Self::is_game_won(&hex_board) {
+				match game.borrow_players().len() {
+					1 | 0 => (),
+					2 => match game.get_player_turn() as usize {
+						0 => T::Elo::update_rating(
+							&game.borrow_players()[0],
+							&game.borrow_players()[1],
+						),
+						1 => T::Elo::update_rating(
+							&game.borrow_players()[1],
+							&game.borrow_players()[0],
+						),
+						_ => return Err(Error::<T>::InternalError.into()), // Should never happen
+					},
+					_ => {
+						T::Elo::update_ratings(
+							&game.borrow_players()[game.get_player_turn() as usize],
+							game.borrow_players(),
+						);
+					},
+				};
+
 				game.state = GameState::Finished { winner: Some(game.get_player_turn()) };
+
+				Self::deposit_event(Event::GameFinished { game_id });
+			} else {
+				// Handle next turn counting
+				let player_turn = game.get_player_turn();
+
+				let next_player_turn =
+					(player_turn + 1) % game.borrow_players().len().saturated_into::<u8>();
+
+				game.set_player_turn(next_player_turn);
+
+				if next_player_turn == 0 {
+					let round = game.get_round() + 1;
+					game.set_round(round);
+
+					if round > game.max_rounds {
+						game.set_state(GameState::Finished { winner: None });
+						
+						Self::deposit_event(Event::GameFinished { game_id });
+
+						return Ok(());
+					}
+				}
+
+				let next_player = game.borrow_players()[next_player_turn as usize].clone();
+
+				Self::deposit_event(Event::NewTurn { game_id, next_player });
 			}
 
-			// Handle next turn counting
-			game.next_turn();
-
-			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
-
 			GameStorage::<T>::set(game_id, Some(game));
-
-			Self::deposit_event(Event::NewTurn { game_id, next_player });
 
 			HexBoardStorage::<T>::set(&who, Some(hex_board));
 
@@ -580,9 +618,6 @@ pub mod pallet {
 			let current_player = game.borrow_players()[game.get_player_turn() as usize].clone();
 			ensure!(current_player != who, Error::<T>::CurrentPlayerCannotForceFinishTurn);
 
-			// Handle next turn counting
-			game.next_turn();
-
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 
 			ensure!(
@@ -594,6 +629,27 @@ pub mod pallet {
 			);
 
 			game.last_played_block = current_block_number;
+			
+			// Handle next turn counting
+			let player_turn = game.get_player_turn();
+
+			let next_player_turn =
+				(player_turn + 1) % game.borrow_players().len().saturated_into::<u8>();
+
+			game.set_player_turn(next_player_turn);
+
+			if next_player_turn == 0 {
+				let round = game.get_round() + 1;
+				game.set_round(round);
+
+				if round > game.max_rounds {
+					game.set_state(GameState::Finished { winner: None });
+					
+					Self::deposit_event(Event::GameFinished { game_id });
+
+					return Ok(());
+				}
+			}
 
 			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
 

@@ -4,6 +4,7 @@
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://substrate.dev/docs/en/knowledgebase/runtime/frame>
 pub use pallet::*;
+use sp_runtime::BoundedVec;
 
 #[cfg(test)]
 mod mock;
@@ -25,11 +26,14 @@ pub mod pallet {
 
 	pub type Rating = u16;
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+		// Maximum number of players that can join a single game
+		#[pallet::constant]
+		type MaxPlayers: Get<u32>;
 	}
 
 	#[pallet::pallet]
@@ -45,13 +49,16 @@ pub mod pallet {
 	pub type RatingStorage<T: Config> =
 		StorageMap<_, Blake2_128Concat, AccountIdOf<T>, Rating, ValueQuery, DefaultRating>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://substrate.dev/docs/en/knowledgebase/runtime/events
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {}
+	pub enum Event<T: Config> {
+		// Player has won and gained rating
+		RatingGained { player: AccountIdOf<T>, new_rating: Rating, rating_gained: Rating },
 
-	// Errors inform users that something went wrong.
+		// Player has lost and lost rating
+		RatingLost { player: AccountIdOf<T>, new_rating: Rating, rating_lost: Rating },
+	}
+
 	#[pallet::error]
 	pub enum Error<T> {}
 
@@ -61,10 +68,52 @@ pub mod pallet {
 
 impl<T: Config> Pallet<T> {
 	fn do_update_rating(winner: &AccountIdOf<T>, loser: &AccountIdOf<T>) -> () {
-		let a: u16 = RatingStorage::<T>::get(winner);
-		let b: u16 = RatingStorage::<T>::get(loser);
+		let a: Rating = RatingStorage::<T>::get(winner);
+		let b: Rating = RatingStorage::<T>::get(loser);
 
-		let rating_change = if b > a {
+		let rating_change = Self::get_rating_change(&a, &b);
+
+		let winner_new_rating = a.saturating_add(rating_change);
+		let loser_new_rating = b.saturating_sub(rating_change);
+
+		RatingStorage::<T>::set(winner, winner_new_rating);
+		RatingStorage::<T>::set(loser, loser_new_rating);
+
+		Self::deposit_event(Event::RatingGained { player: winner.clone(), new_rating: winner_new_rating, rating_gained: rating_change });
+		Self::deposit_event(Event::RatingLost { player: loser.clone(), new_rating: loser_new_rating, rating_lost: rating_change });
+	}
+
+	fn do_update_ratings(winner: &AccountIdOf<T>, losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>) {
+		let a: Rating = RatingStorage::<T>::get(winner);
+	
+		let mut winner_rating_change: Rating = 0;
+
+		for loser in losers.iter() {
+
+			if loser == winner {
+				continue;
+			}
+
+			let b: Rating = RatingStorage::<T>::get(loser);
+	
+			let rating_change = Self::get_rating_change(&a, &b);
+
+			winner_rating_change = winner_rating_change.saturating_add(rating_change);
+			let loser_new_rating = b.saturating_sub(rating_change);
+	
+			RatingStorage::<T>::set(loser, loser_new_rating);
+	
+			Self::deposit_event(Event::RatingLost { player: loser.clone(), new_rating: loser_new_rating, rating_lost: rating_change });
+		}
+	
+		let winner_new_rating = a.saturating_add(winner_rating_change);
+		RatingStorage::<T>::set(winner, winner_new_rating);
+	
+		Self::deposit_event(Event::RatingGained { player: winner.clone(), new_rating: winner_new_rating, rating_gained: winner_rating_change });
+	}
+
+	fn get_rating_change(a: &Rating, b: &Rating) -> Rating {
+		if b > a {
 			match b - a {
 				0..=49 => 16,
 				50..=99 => 17,
@@ -103,20 +152,22 @@ impl<T: Config> Pallet<T> {
 				450..=474 => 2,
 				_ => 1,
 			}
-		};
-
-		RatingStorage::<T>::set(winner, a.saturating_add(rating_change));
-		RatingStorage::<T>::set(loser, b.saturating_sub(rating_change));
+		}
 	}
 }
 
-impl<T: Config> EloFunc<AccountIdOf<T>> for Pallet<T> {
+impl<T: Config> EloFunc<AccountIdOf<T>, <T as Config>::MaxPlayers> for Pallet<T> {
 	fn update_rating(winner: &AccountIdOf<T>, loser: &AccountIdOf<T>) -> () {
 		Self::do_update_rating(winner, loser)
 	}
+
+	fn update_ratings(winner: &AccountIdOf<T>, losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>) -> () {
+		Self::do_update_ratings(winner, losers)
+	}
 }
 
-pub trait EloFunc<AccountId> {
-	/// empty specific bracket queue
+pub trait EloFunc<AccountId, MaxAccounts> {
 	fn update_rating(winner: &AccountId, loser: &AccountId) -> ();
+
+	fn update_ratings(winner: &AccountId, losers: &BoundedVec<AccountId, MaxAccounts>) -> ();
 }
