@@ -53,6 +53,7 @@ pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 # Local Dependencies
 pallet-hexalem                             = { workspace = true }
 pallet-matchmaker                          = { workspace = true }
+pallet-elo                                 = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder                     = { workspace = true }
@@ -75,6 +76,7 @@ std = [
 	"pallet-sudo/std",
 	"pallet-hexalem/std",
 	"pallet-matchmaker/std",
+	"pallet-elo/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
@@ -115,4 +117,5 @@ try-runtime = [
 	"pallet-utility/try-runtime",
 	"pallet-hexalem/try-runtime",
 	"pallet-matchmaker/try-runtime",
+	"pallet-elo/try-runtime",
 ]
