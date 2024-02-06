@@ -309,6 +309,23 @@ pub type HexalemMaxPlayers = ParameterGet<100>;
 pub type HexalemMaxHexGridSize = ParameterGet<49>;
 pub type HexalemMaxTileSelection = ParameterGet<16>;
 
+// matchmaker parameters
+parameter_types! {
+	pub const AmountPlayers: u8 = 2;
+	pub const AmountBrackets: u8 = 2;
+}
+
+impl pallet_matchmaker::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type AmountPlayers = AmountPlayers;
+	type AmountBrackets = AmountBrackets;
+}
+
+impl pallet_elo::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type MaxPlayers = HexalemMaxPlayers;
+}
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 
@@ -478,6 +495,8 @@ impl pallet_hexalem::Config for Runtime {
 	type DefaultPlayerResources = HexalemDefaultPlayerResources;
 	type TargetGoalGold = HexalemTargetGoalGold;
 	type TargetGoalHuman = HexalemTargetGoalHuman;
+	type Matchmaker = MatchmakerModule;
+	type Elo = EloModule;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -492,6 +511,8 @@ construct_runtime!(
 		HexalemModule: pallet_hexalem = 21,
 		Aura: pallet_aura = 100,
 		Grandpa: pallet_grandpa = 101,
+		MatchmakerModule: pallet_matchmaker::{Pallet, Call, Storage, Event<T>} = 199,
+		EloModule: pallet_elo = 198,
 	}
 );
 

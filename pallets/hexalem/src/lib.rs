@@ -3,6 +3,7 @@
 use core::cmp;
 
 use crate::vec::Vec;
+use frame_system::pallet_prelude::BlockNumberFor;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/reference/frame-pallets/>
@@ -26,6 +27,9 @@ use frame_support::{
 	ensure, sp_runtime, sp_runtime::SaturatedConversion, traits::Get, StorageHasher,
 };
 use scale_info::prelude::vec;
+
+use pallet_elo::EloFunc;
+use pallet_matchmaker::MatchFunc;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -114,6 +118,10 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type TargetGoalHuman: Get<ResourceUnit>;
+
+		type Matchmaker: MatchFunc<Self::AccountId>;
+
+		type Elo: EloFunc<Self::AccountId, Self::MaxPlayers>;
 	}
 
 	#[pallet::storage]
@@ -176,6 +184,9 @@ pub mod pallet {
 
 		// HexBoard has not been initialized yet. Unable to play.
 		HexBoardNotInitialized,
+
+		// HexBoard state is set to Matchmaking
+		HexBoardInMatchmakingState,
 
 		// Creator needs to be included among players at index 0
 		CreatorNotInPlayersAtIndexZero,
@@ -273,22 +284,10 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let game_id: GameId = Blake2_256::hash(&(&who, &current_block_number).encode());
 
+			ensure!(players[0] == who, Error::<T>::CreatorNotInPlayersAtIndexZero);
+
 			// Ensure that the game has not already been created
 			ensure!(!GameStorage::<T>::contains_key(&game_id), Error::<T>::GameAlreadyCreated);
-
-			// Default Game Config
-			let mut game = Game {
-				state: GameState::Playing,
-				selection_size: 2,
-				round: 0,
-				max_rounds: T::MaxRounds::get(),
-				player_turn_and_played: 0,
-				last_played_block: current_block_number,
-				players: players.clone().try_into().map_err(|_| Error::<T>::InternalError)?,
-				selection: Default::default(),
-			};
-
-			Self::new_selection(&mut game, game_id)?;
 
 			// Initialise HexBoards for all players
 			for player in &players {
@@ -299,18 +298,78 @@ pub mod pallet {
 					Some(
 						HexBoardOf::<T>::try_new::<T::DefaultPlayerResources>(
 							grid_size as usize,
-							game_id,
+							MatchmakingState::Joined(game_id),
 						)
 						.ok_or(Error::<T>::InternalError)?,
 					),
 				);
 			}
 
-			ensure!(players[0] == who, Error::<T>::CreatorNotInPlayersAtIndexZero);
+			// Default Game Config
+			Self::do_create_new_game(game_id, current_block_number, players, grid_size)
+		}
 
-			GameStorage::<T>::set(game_id, Some(game));
+		#[pallet::call_index(100)]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
+		pub fn queue(origin: OriginFor<T>) -> DispatchResult {
+			let who: AccountIdOf<T> = ensure_signed(origin)?;
 
-			Self::deposit_event(Event::GameCreated { game_id, grid_size, players });
+			// Make sure player has no board open.
+			ensure!(!HexBoardStorage::<T>::contains_key(&who), Error::<T>::AlreadyPlaying);
+
+			// Perhaps in the future, we might want to allow players to play on other grid sizes
+			let grid_size: u8 = 25;
+
+			HexBoardStorage::<T>::set(
+				&who,
+				Some(
+					HexBoardOf::<T>::try_new::<T::DefaultPlayerResources>(
+						grid_size as usize,
+						MatchmakingState::Matchmaking,
+					)
+					.ok_or(Error::<T>::InternalError)?,
+				),
+			);
+
+			// This might change with the introduction of ELO
+			let bracket: u8 = 0;
+
+			// Add player to queue, duplicate check is done in matchmaker.
+			T::Matchmaker::add_queue(who, bracket)?;
+
+			let potential_players = T::Matchmaker::try_match();
+
+			// if result is not empty we have a valid match
+			if !potential_players.is_empty() {
+				// Random GameId
+				// I used `potential_players` to ensure that even if 2 independent players wanted to
+				// create game in the same block, they would be able to.
+				let current_block_number = <frame_system::Pallet<T>>::block_number();
+				let game_id: GameId =
+					Blake2_256::hash(&(&potential_players[0], &current_block_number).encode());
+
+				for player in &potential_players {
+					// Ensures that the HexBoard exists
+					let mut hex_board = match HexBoardStorage::<T>::get(&player) {
+						Some(value) => value,
+						None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+					};
+
+					hex_board.matchmaking_state = MatchmakingState::Joined(game_id);
+
+					HexBoardStorage::<T>::set(player, Some(hex_board));
+				}
+
+				// Create new game
+				Self::do_create_new_game(
+					game_id,
+					current_block_number,
+					potential_players,
+					grid_size,
+				)?;
+
+				// Maybe adjust the weight
+			}
 
 			Ok(())
 		}
@@ -326,7 +385,8 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id;
+			let game_id: GameId =
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
 
 			// Ensures that the Game exists
 			let mut game = match GameStorage::<T>::get(game_id) {
@@ -406,7 +466,8 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id;
+			let game_id: GameId =
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
 
 			// Ensures that the Game exists
 			let game = match GameStorage::<T>::get(game_id) {
@@ -454,7 +515,8 @@ pub mod pallet {
 				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 			};
 
-			let game_id: GameId = hex_board.game_id;
+			let game_id: GameId =
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
 
 			// Ensures that the Game exists
 			let mut game = match GameStorage::<T>::get(game_id) {
@@ -479,21 +541,62 @@ pub mod pallet {
 				Self::new_selection(&mut game, game_id)?;
 			}
 
-			// Updating the resources
+			// Update the resources
 			Self::evaluate_board(&mut hex_board);
 
 			if Self::is_game_won(&hex_board) {
+				match game.borrow_players().len() {
+					1 | 0 => (),
+					2 => match game.get_player_turn() as usize {
+						0 => T::Elo::update_rating(
+							&game.borrow_players()[0],
+							&game.borrow_players()[1],
+						),
+						1 => T::Elo::update_rating(
+							&game.borrow_players()[1],
+							&game.borrow_players()[0],
+						),
+						_ => return Err(Error::<T>::InternalError.into()), // Should never happen
+					},
+					_ => {
+						T::Elo::update_ratings(
+							&game.borrow_players()[game.get_player_turn() as usize],
+							game.borrow_players(),
+						);
+					},
+				};
+
 				game.state = GameState::Finished { winner: Some(game.get_player_turn()) };
+
+				Self::deposit_event(Event::GameFinished { game_id });
+			} else {
+				// Handle next turn counting
+				let player_turn = game.get_player_turn();
+
+				let next_player_turn =
+					(player_turn + 1) % game.borrow_players().len().saturated_into::<u8>();
+
+				game.set_player_turn(next_player_turn);
+
+				if next_player_turn == 0 {
+					let round = game.get_round() + 1;
+					game.set_round(round);
+
+					if round > game.max_rounds {
+						game.set_state(GameState::Finished { winner: None });
+						
+						Self::deposit_event(Event::GameFinished { game_id });
+
+						return Ok(());
+					}
+				}
+
+				let next_player = game.borrow_players()[next_player_turn as usize].clone();
+
+				Self::deposit_event(Event::NewTurn { game_id, next_player });
 			}
 
-			// Handle next turn counting
-			game.next_turn();
-
-			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
-
 			GameStorage::<T>::set(game_id, Some(game));
-
-			Self::deposit_event(Event::NewTurn { game_id, next_player });
 
 			HexBoardStorage::<T>::set(&who, Some(hex_board));
 
@@ -515,9 +618,6 @@ pub mod pallet {
 			let current_player = game.borrow_players()[game.get_player_turn() as usize].clone();
 			ensure!(current_player != who, Error::<T>::CurrentPlayerCannotForceFinishTurn);
 
-			// Handle next turn counting
-			game.next_turn();
-
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 
 			ensure!(
@@ -529,6 +629,27 @@ pub mod pallet {
 			);
 
 			game.last_played_block = current_block_number;
+			
+			// Handle next turn counting
+			let player_turn = game.get_player_turn();
+
+			let next_player_turn =
+				(player_turn + 1) % game.borrow_players().len().saturated_into::<u8>();
+
+			game.set_player_turn(next_player_turn);
+
+			if next_player_turn == 0 {
+				let round = game.get_round() + 1;
+				game.set_round(round);
+
+				if round > game.max_rounds {
+					game.set_state(GameState::Finished { winner: None });
+					
+					Self::deposit_event(Event::GameFinished { game_id });
+
+					return Ok(());
+				}
+			}
 
 			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
 
@@ -591,6 +712,34 @@ pub mod pallet {
 
 // Other helper methods
 impl<T: Config> Pallet<T> {
+	/// Instancializes a new Game
+	fn do_create_new_game(
+		game_id: GameId,
+		current_block_number: BlockNumberFor<T>,
+		players: Vec<AccountIdOf<T>>,
+		grid_size: u8,
+	) -> Result<(), sp_runtime::DispatchError> {
+		// Default Game Config
+		let mut game = Game {
+			state: GameState::Playing,
+			selection_size: 2,
+			round: 0,
+			max_rounds: T::MaxRounds::get(),
+			player_turn_and_played: 0,
+			last_played_block: current_block_number,
+			players: players.clone().try_into().map_err(|_| Error::<T>::InternalError)?,
+			selection: Default::default(),
+		};
+
+		Self::new_selection(&mut game, game_id)?;
+
+		GameStorage::<T>::set(game_id, Some(game));
+
+		Self::deposit_event(Event::GameCreated { game_id, grid_size, players });
+
+		Ok(())
+	}
+
 	/// Helper method that generates a completely new selection from the selection_base
 	fn new_selection(
 		game: &mut GameOf<T>,

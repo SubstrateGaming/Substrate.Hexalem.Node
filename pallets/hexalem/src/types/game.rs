@@ -1,7 +1,5 @@
 use super::*;
 
-use sp_runtime::SaturatedConversion;
-
 #[derive(Encode, Decode, TypeInfo, MaxEncodedLen, PartialEq, Copy, Clone, Debug)]
 pub enum GameState {
 	Matchmaking,
@@ -28,8 +26,6 @@ pub trait GameProperties<Account, MaxPlayers> {
 
 	fn get_selection_size(&self) -> u8;
 	fn set_selection_size(&mut self, selection_size: u8);
-
-	fn next_turn(&mut self);
 }
 
 // Index used for referencing the TileCost
@@ -95,23 +91,5 @@ impl<Account, BlockNumber, MaxPlayers, MaxTiles> GameProperties<Account, MaxPlay
 
 	fn set_selection_size(&mut self, selection_size: u8) {
 		self.selection_size = selection_size;
-	}
-
-	fn next_turn(&mut self) {
-		let player_turn = self.get_player_turn();
-
-		let next_player_turn =
-			(player_turn + 1) % self.borrow_players().len().saturated_into::<u8>();
-
-		self.set_player_turn(next_player_turn);
-
-		if next_player_turn == 0 {
-			let round = self.get_round() + 1;
-			self.set_round(round);
-
-			if round > self.max_rounds {
-				self.set_state(GameState::Finished { winner: None });
-			}
-		}
 	}
 }
