@@ -62,4 +62,4 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-test-
-      - run: cargo test --workspace --all-features --all-targets
+      - run: cargo +stable test --workspace --all-features --all-targets
