@@ -185,10 +185,10 @@ where
 
 		M::take(bracket, v_start)
 			.and_then(|item_key| N::take(bracket, item_key))
-			.and_then(|item| {
+			.map(|item| {
 				v_start = v_start.wrapping_add(1 as u16);
 				self.index_vector[bracket as usize] = (v_start, v_end);
-				Some(item)
+				item
 			})
 	}
 
@@ -204,9 +204,9 @@ where
 		let (v_start, v_end) = self.index_vector[bracket as usize];
 
 		if v_start <= v_end {
-			return v_end - v_start;
+			v_end - v_start
 		} else {
-			return (BufferIndex::MAX - v_start) + v_end;
+			(BufferIndex::MAX - v_start) + v_end
 		}
 	}
 

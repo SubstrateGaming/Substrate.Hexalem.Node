@@ -207,8 +207,8 @@ impl<T: Config> Pallet<T> {
 		}
 
 		// pop from the harvested brackets players
-		for i in 0..brackets.len() {
-			if let Some(p) = queue.pop(brackets[i]) {
+		for bracket in brackets {
+			if let Some(p) = queue.pop(bracket) {
 				result.push(p.account.clone());
 				Self::deposit_event(Event::Popped(p));
 			}
@@ -231,7 +231,7 @@ impl<T: Config> Pallet<T> {
 		let mut total_queued: BufferIndex = 0;
 		// count all existing brackets
 		for i in 0..Self::brackets_count() {
-			total_queued = total_queued + queue.size(i);
+			total_queued = total_queued.saturating_add(queue.size(i));
 		}
 		// return result
 		total_queued
