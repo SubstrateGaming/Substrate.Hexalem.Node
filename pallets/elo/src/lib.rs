@@ -64,7 +64,7 @@ pub mod pallet {
 }
 
 impl<T: Config> Pallet<T> {
-	fn do_update_rating(winner: &AccountIdOf<T>, loser: &AccountIdOf<T>) -> () {
+	fn do_update_rating(winner: &AccountIdOf<T>, loser: &AccountIdOf<T>) {
 		let a: Rating = RatingStorage::<T>::get(winner);
 		let b: Rating = RatingStorage::<T>::get(loser);
 
@@ -172,20 +172,20 @@ impl<T: Config> Pallet<T> {
 }
 
 impl<T: Config> EloFunc<AccountIdOf<T>, <T as Config>::MaxPlayers> for Pallet<T> {
-	fn update_rating(winner: &AccountIdOf<T>, loser: &AccountIdOf<T>) -> () {
+	fn update_rating(winner: &AccountIdOf<T>, loser: &AccountIdOf<T>) {
 		Self::do_update_rating(winner, loser)
 	}
 
 	fn update_ratings(
 		winner: &AccountIdOf<T>,
 		losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>,
-	) -> () {
+	) {
 		Self::do_update_ratings(winner, losers)
 	}
 }
 
 pub trait EloFunc<AccountId, MaxAccounts> {
-	fn update_rating(winner: &AccountId, loser: &AccountId) -> ();
+	fn update_rating(winner: &AccountId, loser: &AccountId);
 
-	fn update_ratings(winner: &AccountId, losers: &BoundedVec<AccountId, MaxAccounts>) -> ();
+	fn update_ratings(winner: &AccountId, losers: &BoundedVec<AccountId, MaxAccounts>);
 }

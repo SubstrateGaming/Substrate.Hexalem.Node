@@ -287,7 +287,7 @@ pub mod pallet {
 			ensure!(players[0] == who, Error::<T>::CreatorNotInPlayersAtIndexZero);
 
 			// Ensure that the game has not already been created
-			ensure!(!GameStorage::<T>::contains_key(&game_id), Error::<T>::GameAlreadyCreated);
+			ensure!(!GameStorage::<T>::contains_key(game_id), Error::<T>::GameAlreadyCreated);
 
 			// Initialise HexBoards for all players
 			for player in &players {
@@ -350,7 +350,7 @@ pub mod pallet {
 
 				for player in &potential_players {
 					// Ensures that the HexBoard exists
-					let mut hex_board = match HexBoardStorage::<T>::get(&player) {
+					let mut hex_board = match HexBoardStorage::<T>::get(player) {
 						Some(value) => value,
 						None => return Err(Error::<T>::HexBoardNotInitialized.into()),
 					};
@@ -1218,6 +1218,6 @@ impl<T: Config> Pallet<T> {
 
 	#[cfg(any(feature = "std", feature = "runtime-benchmarks", test))]
 	pub fn set_game(game_id: GameId, game: GameOf<T>) {
-		<GameStorage<T>>::set(&game_id, Some(game));
+		<GameStorage<T>>::set(game_id, Some(game));
 	}
 }

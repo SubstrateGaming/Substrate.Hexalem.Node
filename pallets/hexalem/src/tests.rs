@@ -700,7 +700,7 @@ fn upgrade() {
 		let upgrade_costs: [[ResourceUnit; NUMBER_OF_RESOURCE_TYPES]; NUMBER_OF_LEVELS - 1] =
 			[[0, 0, 0, 0, 2, 2, 0], [0, 0, 0, 0, 4, 4, 2], [0, 0, 0, 0, 6, 6, 4]];
 
-		for level in 0..(NUMBER_OF_LEVELS - 1) {
+		for (level, upgrade_costs_for_level) in upgrade_costs.iter().enumerate().take(NUMBER_OF_LEVELS - 1) {
 			assert_ok!(HexalemModule::upgrade(RuntimeOrigin::signed(1), 12));
 
 			let hex_board_option: Option<HexBoardOf<TestRuntime>> =
@@ -708,9 +708,9 @@ fn upgrade() {
 
 			let hex_board = hex_board_option.unwrap();
 
-			let mut resources_expected = [10; NUMBER_OF_RESOURCE_TYPES];
-			for resource_type in 0..NUMBER_OF_RESOURCE_TYPES {
-				resources_expected[resource_type] -= upgrade_costs[level][resource_type];
+			let mut resources_expected = [10u8; NUMBER_OF_RESOURCE_TYPES];
+			for (resource_type, upgrade_cost) in upgrade_costs_for_level.iter().enumerate().take(NUMBER_OF_RESOURCE_TYPES) {
+				resources_expected[resource_type] -= upgrade_cost;
 			}
 
 			assert_eq!(
@@ -1044,8 +1044,8 @@ fn elo_2p_match() {
 			EloEvent::RatingLost { player: 2, new_rating: 984, rating_lost: 16 }.into(),
 		);
 
-		assert_eq!(EloModule::get_rating(&1), 1016);
-		assert_eq!(EloModule::get_rating(&2), 984);
+		assert_eq!(EloModule::get_rating(1), 1016);
+		assert_eq!(EloModule::get_rating(2), 984);
 	});
 }
 
@@ -1118,9 +1118,9 @@ fn elo_4p_match() {
 			EloEvent::RatingLost { player: 4, new_rating: 984, rating_lost: 16 }.into(),
 		);
 
-		assert_eq!(EloModule::get_rating(&1), 1048);
-		assert_eq!(EloModule::get_rating(&2), 984);
-		assert_eq!(EloModule::get_rating(&3), 984);
-		assert_eq!(EloModule::get_rating(&4), 984);
+		assert_eq!(EloModule::get_rating(1), 1048);
+		assert_eq!(EloModule::get_rating(2), 984);
+		assert_eq!(EloModule::get_rating(3), 984);
+		assert_eq!(EloModule::get_rating(4), 984);
 	});
 }
