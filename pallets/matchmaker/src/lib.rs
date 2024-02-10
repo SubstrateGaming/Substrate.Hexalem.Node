@@ -65,7 +65,7 @@ pub mod pallet {
 	pub fn BracketsCountDefault<T: Config>() -> u8 {
 		T::AmountBrackets::get()
 	}
-	
+
 	#[pallet::storage]
 	#[pallet::getter(fn brackets_count)]
 	pub type BracketsCount<T: Config> = StorageValue<_, u8, ValueQuery, BracketsCountDefault<T>>;
@@ -130,7 +130,7 @@ pub mod pallet {
 	}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T> { }
+	impl<T: Config> Pallet<T> {}
 }
 
 impl<T: Config> Pallet<T> {
@@ -159,7 +159,7 @@ impl<T: Config> Pallet<T> {
 		}
 
 		Self::deposit_event(Event::Queued(player));
-		
+
 		Ok(())
 	}
 

@@ -76,37 +76,55 @@ impl<T: Config> Pallet<T> {
 		RatingStorage::<T>::set(winner, winner_new_rating);
 		RatingStorage::<T>::set(loser, loser_new_rating);
 
-		Self::deposit_event(Event::RatingGained { player: winner.clone(), new_rating: winner_new_rating, rating_gained: rating_change });
-		Self::deposit_event(Event::RatingLost { player: loser.clone(), new_rating: loser_new_rating, rating_lost: rating_change });
+		Self::deposit_event(Event::RatingGained {
+			player: winner.clone(),
+			new_rating: winner_new_rating,
+			rating_gained: rating_change,
+		});
+		Self::deposit_event(Event::RatingLost {
+			player: loser.clone(),
+			new_rating: loser_new_rating,
+			rating_lost: rating_change,
+		});
 	}
 
-	fn do_update_ratings(winner: &AccountIdOf<T>, losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>) {
+	fn do_update_ratings(
+		winner: &AccountIdOf<T>,
+		losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>,
+	) {
 		let a: Rating = RatingStorage::<T>::get(winner);
-	
+
 		let mut winner_rating_change: Rating = 0;
 
 		for loser in losers.iter() {
-
 			if loser == winner {
 				continue;
 			}
 
 			let b: Rating = RatingStorage::<T>::get(loser);
-	
+
 			let rating_change = Self::get_rating_change(&a, &b);
 
 			winner_rating_change = winner_rating_change.saturating_add(rating_change);
 			let loser_new_rating = b.saturating_sub(rating_change);
-	
+
 			RatingStorage::<T>::set(loser, loser_new_rating);
-	
-			Self::deposit_event(Event::RatingLost { player: loser.clone(), new_rating: loser_new_rating, rating_lost: rating_change });
+
+			Self::deposit_event(Event::RatingLost {
+				player: loser.clone(),
+				new_rating: loser_new_rating,
+				rating_lost: rating_change,
+			});
 		}
-	
+
 		let winner_new_rating = a.saturating_add(winner_rating_change);
 		RatingStorage::<T>::set(winner, winner_new_rating);
-	
-		Self::deposit_event(Event::RatingGained { player: winner.clone(), new_rating: winner_new_rating, rating_gained: winner_rating_change });
+
+		Self::deposit_event(Event::RatingGained {
+			player: winner.clone(),
+			new_rating: winner_new_rating,
+			rating_gained: winner_rating_change,
+		});
 	}
 
 	fn get_rating_change(a: &Rating, b: &Rating) -> Rating {
@@ -158,7 +176,10 @@ impl<T: Config> EloFunc<AccountIdOf<T>, <T as Config>::MaxPlayers> for Pallet<T>
 		Self::do_update_rating(winner, loser)
 	}
 
-	fn update_ratings(winner: &AccountIdOf<T>, losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>) -> () {
+	fn update_ratings(
+		winner: &AccountIdOf<T>,
+		losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>,
+	) -> () {
 		Self::do_update_ratings(winner, losers)
 	}
 }

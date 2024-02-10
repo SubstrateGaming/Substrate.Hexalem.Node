@@ -210,15 +210,15 @@ frame_support::construct_runtime!(
 
 // matchmaker parameters
 parameter_types! {
-    pub const AmountPlayers: u8 = 2;
-    pub const AmountBrackets: u8 = 2;
+	pub const AmountPlayers: u8 = 2;
+	pub const AmountBrackets: u8 = 2;
 }
 
 /// pallet used for matchmaking in pallet-rps.
 impl pallet_matchmaker::Config for TestRuntime {
-    type RuntimeEvent = RuntimeEvent;
-    type AmountPlayers = AmountPlayers;
-    type AmountBrackets = AmountBrackets;
+	type RuntimeEvent = RuntimeEvent;
+	type AmountPlayers = AmountPlayers;
+	type AmountBrackets = AmountBrackets;
 }
 
 impl pallet_elo::Config for TestRuntime {

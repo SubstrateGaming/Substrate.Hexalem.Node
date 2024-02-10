@@ -1,7 +1,5 @@
 use crate as pallet_elo;
-use frame_support::{
-	traits::{ConstU16, ConstU64},
-};
+use frame_support::traits::{ConstU16, ConstU64};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{Get, H256};

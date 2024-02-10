@@ -1,6 +1,5 @@
-use crate::{mock::*, types::*, *};
+use crate::{mock::*, types::*, Event, *};
 use frame_support::{assert_noop, assert_ok};
-use crate::Event;
 use pallet_elo::Event as EloEvent;
 
 #[test]
@@ -966,7 +965,7 @@ fn simple_2p_matchmaking() {
 }
 
 #[test]
-fn queue_edgecases(){
+fn queue_edgecases() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
@@ -1031,22 +1030,17 @@ fn elo_2p_match() {
 		hex_board.hex_grid = new_hex_grid;
 
 		// Set player resources to 99 and set a new hex_grid
-		HexalemModule::set_hex_board(
-			1,
-			hex_board,
-		);
+		HexalemModule::set_hex_board(1, hex_board);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
 
-		System::assert_has_event(
-			Event::GameFinished { game_id }.into(),
-		);
+		System::assert_has_event(Event::GameFinished { game_id }.into());
 
 		System::assert_has_event(
 			EloEvent::RatingGained { player: 1, new_rating: 1016, rating_gained: 16 }.into(),
 		);
-    
-        System::assert_has_event(
+
+		System::assert_has_event(
 			EloEvent::RatingLost { player: 2, new_rating: 984, rating_lost: 16 }.into(),
 		);
 
@@ -1106,20 +1100,15 @@ fn elo_4p_match() {
 		hex_board.hex_grid = new_hex_grid;
 
 		// Set player resources to 99 and set a new hex_grid
-		HexalemModule::set_hex_board(
-			1,
-			hex_board,
-		);
+		HexalemModule::set_hex_board(1, hex_board);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
 
-		System::assert_has_event(
-			Event::GameFinished { game_id }.into(),
-		);
+		System::assert_has_event(Event::GameFinished { game_id }.into());
 		System::assert_has_event(
 			EloEvent::RatingGained { player: 1, new_rating: 1048, rating_gained: 48 }.into(),
 		);
-        System::assert_has_event(
+		System::assert_has_event(
 			EloEvent::RatingLost { player: 2, new_rating: 984, rating_lost: 16 }.into(),
 		);
 		System::assert_has_event(

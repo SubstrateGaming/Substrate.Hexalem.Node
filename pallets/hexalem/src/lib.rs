@@ -584,7 +584,7 @@ pub mod pallet {
 
 					if round > game.max_rounds {
 						game.set_state(GameState::Finished { winner: None });
-						
+
 						Self::deposit_event(Event::GameFinished { game_id });
 
 						return Ok(());
@@ -629,7 +629,7 @@ pub mod pallet {
 			);
 
 			game.last_played_block = current_block_number;
-			
+
 			// Handle next turn counting
 			let player_turn = game.get_player_turn();
 
@@ -644,7 +644,7 @@ pub mod pallet {
 
 				if round > game.max_rounds {
 					game.set_state(GameState::Finished { winner: None });
-					
+
 					Self::deposit_event(Event::GameFinished { game_id });
 
 					return Ok(());

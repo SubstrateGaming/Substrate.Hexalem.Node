@@ -103,10 +103,7 @@ where
 			index_vector.push((start, end));
 		}
 
-		BracketsTransient {
-			index_vector,
-			_phantom: PhantomData,
-		}
+		BracketsTransient { index_vector, _phantom: PhantomData }
 	}
 }
 
