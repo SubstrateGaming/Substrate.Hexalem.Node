@@ -1,6 +1,4 @@
-use sp_runtime::BoundedVec;
-
-use crate::{mock::*, AccountIdOf, Event, RatingStorage};
+use crate::{mock::*, Event, RatingStorage};
 
 #[test]
 fn test_equal_elo() {
