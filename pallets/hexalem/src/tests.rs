@@ -700,7 +700,9 @@ fn upgrade() {
 		let upgrade_costs: [[ResourceUnit; NUMBER_OF_RESOURCE_TYPES]; NUMBER_OF_LEVELS - 1] =
 			[[0, 0, 0, 0, 2, 2, 0], [0, 0, 0, 0, 4, 4, 2], [0, 0, 0, 0, 6, 6, 4]];
 
-		for (level, upgrade_costs_for_level) in upgrade_costs.iter().enumerate().take(NUMBER_OF_LEVELS - 1) {
+		for (level, upgrade_costs_for_level) in
+			upgrade_costs.iter().enumerate().take(NUMBER_OF_LEVELS - 1)
+		{
 			assert_ok!(HexalemModule::upgrade(RuntimeOrigin::signed(1), 12));
 
 			let hex_board_option: Option<HexBoardOf<TestRuntime>> =
@@ -709,7 +711,9 @@ fn upgrade() {
 			let hex_board = hex_board_option.unwrap();
 
 			let mut resources_expected = [10u8; NUMBER_OF_RESOURCE_TYPES];
-			for (resource_type, upgrade_cost) in upgrade_costs_for_level.iter().enumerate().take(NUMBER_OF_RESOURCE_TYPES) {
+			for (resource_type, upgrade_cost) in
+				upgrade_costs_for_level.iter().enumerate().take(NUMBER_OF_RESOURCE_TYPES)
+			{
 				resources_expected[resource_type] -= upgrade_cost;
 			}
 
