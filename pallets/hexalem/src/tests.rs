@@ -375,6 +375,70 @@ fn test_saturate_99() {
 }
 
 #[test]
+fn test_game_finishes_on_25th_round() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), vec![1], 25));
+
+		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
+			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
+		}
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(1);
+
+		let hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
+
+		System::assert_has_event(Event::GameFinished { game_id }.into());
+
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::GameNotPlaying
+		);
+	});
+}
+
+#[test]
+fn test_game_finishes_on_25th_round_3p() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), vec![1, 2, 3], 25));
+
+		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
+			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
+			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(2)));
+			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(3)));
+		}
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(2);
+
+		let hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
+
+		System::assert_has_event(Event::GameFinished { game_id }.into());
+
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::GameNotPlaying
+		);
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::GameNotPlaying
+		);
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(3)),
+			Error::<TestRuntime>::GameNotPlaying
+		);
+	});
+}
+
+#[test]
 fn test_force_finish_turn() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), vec![1, 2], 25));

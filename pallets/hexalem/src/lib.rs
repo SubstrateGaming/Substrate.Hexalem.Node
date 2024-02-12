@@ -582,10 +582,14 @@ pub mod pallet {
 					let round = game.get_round() + 1;
 					game.set_round(round);
 
-					if round > game.max_rounds {
+					if round >= game.max_rounds {
 						game.set_state(GameState::Finished { winner: None });
 
 						Self::deposit_event(Event::GameFinished { game_id });
+
+						GameStorage::<T>::set(game_id, Some(game));
+
+						HexBoardStorage::<T>::set(&who, Some(hex_board));
 
 						return Ok(());
 					}
