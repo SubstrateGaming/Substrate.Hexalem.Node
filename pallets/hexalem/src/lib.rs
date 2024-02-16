@@ -581,23 +581,17 @@ pub mod pallet {
 				if next_player_turn == 0 {
 					let round = game.get_round() + 1;
 					game.set_round(round);
-
-					if round >= game.max_rounds {
-						game.set_state(GameState::Finished { winner: None });
-
-						Self::deposit_event(Event::GameFinished { game_id });
-
-						GameStorage::<T>::set(game_id, Some(game));
-
-						HexBoardStorage::<T>::set(&who, Some(hex_board));
-
-						return Ok(());
-					}
 				}
 
-				let next_player = game.borrow_players()[next_player_turn as usize].clone();
+				if game.get_round() >= game.max_rounds {
+					game.set_state(GameState::Finished { winner: None });
 
-				Self::deposit_event(Event::NewTurn { game_id, next_player });
+					Self::deposit_event(Event::GameFinished { game_id });
+				} else {
+					let next_player = game.borrow_players()[next_player_turn as usize].clone();
+
+					Self::deposit_event(Event::NewTurn { game_id, next_player });
+				}
 			}
 
 			GameStorage::<T>::set(game_id, Some(game));
