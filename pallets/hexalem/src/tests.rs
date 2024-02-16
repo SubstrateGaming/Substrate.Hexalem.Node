@@ -468,17 +468,23 @@ fn test_game_force_finishes_on_25th_round_3p() {
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			System::set_block_number(
-				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 + System::block_number() + 1,
+				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 +
+					System::block_number() +
+					1,
 			);
 			assert_ok!(HexalemModule::force_finish_turn(RuntimeOrigin::signed(2), game_id));
 
 			System::set_block_number(
-				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 + System::block_number() + 1,
+				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 +
+					System::block_number() +
+					1,
 			);
 			assert_ok!(HexalemModule::force_finish_turn(RuntimeOrigin::signed(3), game_id));
 
 			System::set_block_number(
-				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 + System::block_number() + 1,
+				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 +
+					System::block_number() +
+					1,
 			);
 			assert_ok!(HexalemModule::force_finish_turn(RuntimeOrigin::signed(1), game_id));
 		}
@@ -1270,36 +1276,39 @@ fn clean_hex_board_storage() {
 		HexBoardStorage::<TestRuntime>::set(
 			1,
 			Some(
-				HexBoardOf::<TestRuntime>::try_new::<<mock::TestRuntime as pallet::Config>::DefaultPlayerResources>(
-					25,
-					MatchmakingState::Matchmaking,
-				)
+				HexBoardOf::<TestRuntime>::try_new::<
+					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
+				>(25, MatchmakingState::Matchmaking)
 				.unwrap(),
 			),
 		);
 
-		assert_noop!(HexalemModule::receive_rewards(RuntimeOrigin::signed(1)), Error::<TestRuntime>::HexBoardNotInFinishedState);
+		assert_noop!(
+			HexalemModule::receive_rewards(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::HexBoardNotInFinishedState
+		);
 
 		HexBoardStorage::<TestRuntime>::set(
 			2,
 			Some(
-				HexBoardOf::<TestRuntime>::try_new::<<mock::TestRuntime as pallet::Config>::DefaultPlayerResources>(
-					25,
-					MatchmakingState::Joined(Default::default()),
-				)
+				HexBoardOf::<TestRuntime>::try_new::<
+					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
+				>(25, MatchmakingState::Joined(Default::default()))
 				.unwrap(),
 			),
 		);
 
-		assert_noop!(HexalemModule::receive_rewards(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInFinishedState);
+		assert_noop!(
+			HexalemModule::receive_rewards(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::HexBoardNotInFinishedState
+		);
 
 		HexBoardStorage::<TestRuntime>::set(
 			3,
 			Some(
-				HexBoardOf::<TestRuntime>::try_new::<<mock::TestRuntime as pallet::Config>::DefaultPlayerResources>(
-					25,
-					MatchmakingState::Finished(Rewards::Winner),
-				)
+				HexBoardOf::<TestRuntime>::try_new::<
+					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
+				>(25, MatchmakingState::Finished(Rewards::Winner))
 				.unwrap(),
 			),
 		);
