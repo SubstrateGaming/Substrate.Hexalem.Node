@@ -169,6 +169,8 @@ pub mod pallet {
 		// Game has finished
 		GameFinished { game_id: GameId /* , winner: AccountIdOf<T> */ },
 
+		HexBoardDeleted { player: AccountIdOf<T> },
+
 		// Event that is never used. It serves the purpose to expose hidden rust enums
 		ExposeEnums { tile_type: TileType, tile_pattern: TilePattern },
 	}
@@ -185,8 +187,11 @@ pub mod pallet {
 		// HexBoard has not been initialized yet. Unable to play.
 		HexBoardNotInitialized,
 
-		// HexBoard state is set to Matchmaking
-		HexBoardInMatchmakingState,
+		// HexBoard state is not set to playing state
+		HexBoardNotInPlayingState,
+
+		// HexBoard state is not set to finished state
+		HexBoardNotInFinishedState,
 
 		// Creator needs to be included among players at index 0
 		CreatorNotInPlayersAtIndexZero,
@@ -386,7 +391,7 @@ pub mod pallet {
 			};
 
 			let game_id: GameId =
-				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardNotInPlayingState)?;
 
 			// Ensures that the Game exists
 			let mut game = match GameStorage::<T>::get(game_id) {
@@ -467,7 +472,7 @@ pub mod pallet {
 			};
 
 			let game_id: GameId =
-				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardNotInPlayingState)?;
 
 			// Ensures that the Game exists
 			let game = match GameStorage::<T>::get(game_id) {
@@ -516,7 +521,7 @@ pub mod pallet {
 			};
 
 			let game_id: GameId =
-				hex_board.get_game_id().ok_or(Error::<T>::HexBoardInMatchmakingState)?;
+				hex_board.get_game_id().ok_or(Error::<T>::HexBoardNotInPlayingState)?;
 
 			// Ensures that the Game exists
 			let mut game = match GameStorage::<T>::get(game_id) {
@@ -568,6 +573,22 @@ pub mod pallet {
 
 				game.state = GameState::Finished { winner: Some(game.get_player_turn()) };
 
+				for player in game.borrow_players() {
+					if player == &who {
+						hex_board.matchmaking_state = MatchmakingState::Finished(Rewards::Winner);
+					} else {
+						let mut other_hex_board = match HexBoardStorage::<T>::get(player) {
+							Some(value) => value,
+							None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+						};
+
+						other_hex_board.matchmaking_state =
+							MatchmakingState::Finished(Rewards::Loser);
+
+						HexBoardStorage::<T>::set(player, Some(other_hex_board));
+					}
+				}
+
 				Self::deposit_event(Event::GameFinished { game_id });
 			} else {
 				// Handle next turn counting
@@ -579,25 +600,35 @@ pub mod pallet {
 				game.set_player_turn(next_player_turn);
 
 				if next_player_turn == 0 {
-					let round = game.get_round() + 1;
-					game.set_round(round);
-
-					if round >= game.max_rounds {
-						game.set_state(GameState::Finished { winner: None });
-
-						Self::deposit_event(Event::GameFinished { game_id });
-
-						GameStorage::<T>::set(game_id, Some(game));
-
-						HexBoardStorage::<T>::set(&who, Some(hex_board));
-
-						return Ok(());
-					}
+					game.set_round(game.get_round() + 1);
 				}
 
-				let next_player = game.borrow_players()[next_player_turn as usize].clone();
+				if game.get_round() >= game.max_rounds {
+					// Maybe clean the game instead..
+					game.set_state(GameState::Finished { winner: None });
 
-				Self::deposit_event(Event::NewTurn { game_id, next_player });
+					for player in game.borrow_players() {
+						if player == &who {
+							hex_board.matchmaking_state = MatchmakingState::Finished(Rewards::Draw);
+						} else {
+							let mut other_hex_board = match HexBoardStorage::<T>::get(player) {
+								Some(value) => value,
+								None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+							};
+
+							other_hex_board.matchmaking_state =
+								MatchmakingState::Finished(Rewards::Draw);
+
+							HexBoardStorage::<T>::set(player, Some(other_hex_board));
+						}
+					}
+
+					Self::deposit_event(Event::GameFinished { game_id });
+				} else {
+					let next_player = game.borrow_players()[next_player_turn as usize].clone();
+
+					Self::deposit_event(Event::NewTurn { game_id, next_player });
+				}
 			}
 
 			GameStorage::<T>::set(game_id, Some(game));
@@ -645,31 +676,65 @@ pub mod pallet {
 			if next_player_turn == 0 {
 				let round = game.get_round() + 1;
 				game.set_round(round);
-
-				if round > game.max_rounds {
-					game.set_state(GameState::Finished { winner: None });
-
-					Self::deposit_event(Event::GameFinished { game_id });
-
-					return Ok(());
-				}
 			}
 
-			let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
+			Self::deposit_event(Event::TurnForceFinished { game_id, player: current_player });
+
+			if game.get_round() >= game.max_rounds {
+				game.set_state(GameState::Finished { winner: None });
+
+				for player in game.borrow_players() {
+					let mut other_hex_board = match HexBoardStorage::<T>::get(player) {
+						Some(value) => value,
+						None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+					};
+
+					other_hex_board.matchmaking_state = MatchmakingState::Finished(Rewards::Draw);
+
+					HexBoardStorage::<T>::set(player, Some(other_hex_board));
+				}
+
+				Self::deposit_event(Event::GameFinished { game_id });
+			} else {
+				let next_player = game.borrow_players()[game.get_player_turn() as usize].clone();
+
+				Self::deposit_event(Event::NewTurn { game_id, next_player });
+			}
 
 			GameStorage::<T>::set(game_id, Some(game));
-
-			Self::deposit_event(Event::NewTurn { game_id, next_player });
-
-			Self::deposit_event(Event::TurnForceFinished { game_id, player: current_player });
 
 			Ok(())
 		}
 
 		#[pallet::call_index(5)]
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
-		pub fn receive_reward(_origin: OriginFor<T>) -> DispatchResult {
-			todo!()
+		pub fn receive_rewards(origin: OriginFor<T>) -> DispatchResult {
+			let who: AccountIdOf<T> = ensure_signed(origin)?;
+
+			// Ensures that the HexBoard exists
+			let hex_board = match HexBoardStorage::<T>::get(&who) {
+				Some(value) => value,
+				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+			};
+
+			match hex_board.matchmaking_state {
+				MatchmakingState::Finished(Rewards::Winner) => {
+					// Handle giving rewards
+				},
+				MatchmakingState::Finished(Rewards::Draw) => {
+					// Handle giving rewards
+				},
+				MatchmakingState::Finished(Rewards::Loser) => {
+					// Handle giving rewards
+				},
+				_ => return Err(Error::<T>::HexBoardNotInFinishedState.into()),
+			};
+
+			// Clean the HexBoardStorage
+			HexBoardStorage::<T>::remove(&who);
+			Self::deposit_event(Event::HexBoardDeleted { player: who });
+
+			Ok(())
 		}
 
 		#[pallet::call_index(6)]

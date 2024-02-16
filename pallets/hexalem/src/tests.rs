@@ -381,6 +381,13 @@ fn test_game_finishes_on_25th_round() {
 
 		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), vec![1], 25));
 
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(1);
+
+		let hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
+
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
 		}
@@ -390,13 +397,13 @@ fn test_game_finishes_on_25th_round() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::GameNotPlaying
+			Error::<TestRuntime>::HexBoardNotInPlayingState,
 		);
 	});
 }
@@ -407,6 +414,13 @@ fn test_game_finishes_on_25th_round_3p() {
 		System::set_block_number(1);
 
 		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), vec![1, 2, 3], 25));
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(2);
+
+		let hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -419,21 +433,76 @@ fn test_game_finishes_on_25th_round_3p() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::GameNotPlaying
+			Error::<TestRuntime>::HexBoardNotInPlayingState
 		);
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(2)),
-			Error::<TestRuntime>::GameNotPlaying
+			Error::<TestRuntime>::HexBoardNotInPlayingState
 		);
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(3)),
-			Error::<TestRuntime>::GameNotPlaying
+			Error::<TestRuntime>::HexBoardNotInPlayingState
+		);
+	});
+}
+
+#[test]
+fn test_game_force_finishes_on_25th_round_3p() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(1), vec![1, 2, 3], 25));
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(2);
+
+		let hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.get_game_id().unwrap();
+
+		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
+			System::set_block_number(
+				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 + System::block_number() + 1,
+			);
+			assert_ok!(HexalemModule::force_finish_turn(RuntimeOrigin::signed(2), game_id));
+
+			System::set_block_number(
+				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 + System::block_number() + 1,
+			);
+			assert_ok!(HexalemModule::force_finish_turn(RuntimeOrigin::signed(3), game_id));
+
+			System::set_block_number(
+				<mock::TestRuntime as pallet::Config>::BlocksToPlayLimit::get() as u64 + System::block_number() + 1,
+			);
+			assert_ok!(HexalemModule::force_finish_turn(RuntimeOrigin::signed(1), game_id));
+		}
+
+		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(2);
+
+		let hex_board = hex_board_option.unwrap();
+
+		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+
+		System::assert_has_event(Event::GameFinished { game_id }.into());
+
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::HexBoardNotInPlayingState
+		);
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::HexBoardNotInPlayingState
+		);
+		assert_noop!(
+			HexalemModule::finish_turn(RuntimeOrigin::signed(3)),
+			Error::<TestRuntime>::HexBoardNotInPlayingState
 		);
 	});
 }
@@ -1190,5 +1259,51 @@ fn elo_4p_match() {
 		assert_eq!(EloModule::get_rating(2), 984);
 		assert_eq!(EloModule::get_rating(3), 984);
 		assert_eq!(EloModule::get_rating(4), 984);
+	});
+}
+
+#[test]
+fn clean_hex_board_storage() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		HexBoardStorage::<TestRuntime>::set(
+			1,
+			Some(
+				HexBoardOf::<TestRuntime>::try_new::<<mock::TestRuntime as pallet::Config>::DefaultPlayerResources>(
+					25,
+					MatchmakingState::Matchmaking,
+				)
+				.unwrap(),
+			),
+		);
+
+		assert_noop!(HexalemModule::receive_rewards(RuntimeOrigin::signed(1)), Error::<TestRuntime>::HexBoardNotInFinishedState);
+
+		HexBoardStorage::<TestRuntime>::set(
+			2,
+			Some(
+				HexBoardOf::<TestRuntime>::try_new::<<mock::TestRuntime as pallet::Config>::DefaultPlayerResources>(
+					25,
+					MatchmakingState::Joined(Default::default()),
+				)
+				.unwrap(),
+			),
+		);
+
+		assert_noop!(HexalemModule::receive_rewards(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInFinishedState);
+
+		HexBoardStorage::<TestRuntime>::set(
+			3,
+			Some(
+				HexBoardOf::<TestRuntime>::try_new::<<mock::TestRuntime as pallet::Config>::DefaultPlayerResources>(
+					25,
+					MatchmakingState::Finished(Rewards::Winner),
+				)
+				.unwrap(),
+			),
+		);
+
+		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(3)));
 	});
 }

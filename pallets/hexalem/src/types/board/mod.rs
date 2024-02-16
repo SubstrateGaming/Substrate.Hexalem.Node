@@ -32,9 +32,18 @@ pub struct TileCost<Tile> {
 }
 
 #[derive(Encode, Decode, TypeInfo, MaxEncodedLen, Eq, PartialEq, Debug)]
+pub enum Rewards {
+	Winner,
+	Loser,
+	Draw,
+	// Other types of rewards
+}
+
+#[derive(Encode, Decode, TypeInfo, MaxEncodedLen, Eq, PartialEq, Debug)]
 pub enum MatchmakingState {
 	Matchmaking,
 	Joined(GameId),
+	Finished(Rewards),
 }
 
 // The board hex grid
@@ -82,8 +91,8 @@ where
 
 	pub fn get_game_id(&self) -> Option<GameId> {
 		match self.matchmaking_state {
-			MatchmakingState::Matchmaking => None,
 			MatchmakingState::Joined(game_id) => Some(game_id),
+			_ => None,
 		}
 	}
 
