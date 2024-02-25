@@ -1,4 +1,7 @@
 use crate::{mock::*, Error};
+use frame_support::StorageHasher;
+use frame_support::Blake2_128;
+use parity_scale_codec::Encode;
 
 #[test]
 fn test_is_queued() {
@@ -109,5 +112,47 @@ fn test_brackets() {
 		assert!(MatchMaker::do_try_match().is_empty());
 		assert_eq!(MatchMaker::do_add_queue(player5, 1), Ok(()));
 		assert_eq!(MatchMaker::do_try_match(), [5, 6]);
+	});
+}
+
+#[test]
+fn test_match_all_random() {
+	new_test_ext().execute_with(|| {
+		let empty: Vec<Vec<u64>> = vec![];
+
+		assert_eq!(MatchMaker::do_queue_size(0), 0);
+		assert_eq!(MatchMaker::do_all_queue_size(), 0);
+		assert_eq!(MatchMaker::do_add_queue(1, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(2, 0), Ok(()));
+		assert_eq!(MatchMaker::do_try_match_all_random(0, &Default::default()), [[1, 2]]);
+		assert_eq!(MatchMaker::do_try_match_all_random(0, &Default::default()), empty);
+
+		assert_eq!(MatchMaker::do_add_queue(1, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(2, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(3, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(4, 0), Ok(()));
+		assert_eq!(MatchMaker::do_try_match_all_random(0, &Default::default()), [[1, 2], [3, 4]]);
+		assert_eq!(MatchMaker::do_queue_size(0), 0);
+
+		let seed = Blake2_128::hash(&2u8.encode());
+
+		assert_eq!(MatchMaker::do_add_queue(1, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(2, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(3, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(4, 0), Ok(()));
+		assert_eq!(MatchMaker::do_try_match_all_random(0, &seed), [[1, 4], [2, 3]]); // Might fail if the underlaying logic changes
+		assert_eq!(MatchMaker::do_queue_size(0), 0);
+
+		let seed = Blake2_128::hash(&1u8.encode());
+
+		assert_eq!(MatchMaker::do_add_queue(1, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(2, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(3, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(4, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(5, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(6, 0), Ok(()));
+		assert_eq!(MatchMaker::do_add_queue(7, 0), Ok(()));
+		assert_eq!(MatchMaker::do_try_match_all_random(0, &seed), [[5, 6], [3, 4], [1, 2]]); // Might fail if the underlaying logic changes
+		assert_eq!(MatchMaker::do_queue_size(0), 1);
 	});
 }

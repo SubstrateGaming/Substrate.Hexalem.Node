@@ -31,21 +31,6 @@ pub struct TileCost<Tile> {
 	pub cost: ResourceAmount,
 }
 
-#[derive(Encode, Decode, TypeInfo, MaxEncodedLen, Eq, PartialEq, Debug)]
-pub enum Rewards {
-	Winner,
-	Loser,
-	Draw,
-	// Other types of rewards
-}
-
-#[derive(Encode, Decode, TypeInfo, MaxEncodedLen, Eq, PartialEq, Debug)]
-pub enum MatchmakingState {
-	Matchmaking,
-	Joined(GameId),
-	Finished(Rewards),
-}
-
 // The board hex grid
 pub type HexGrid<Tile, N> = BoundedVec<Tile, N>;
 
@@ -54,7 +39,6 @@ pub type HexGrid<Tile, N> = BoundedVec<Tile, N>;
 pub struct HexBoard<Tile, MaxGridSize> {
 	pub resources: [ResourceUnit; NUMBER_OF_RESOURCE_TYPES],
 	pub hex_grid: HexGrid<Tile, MaxGridSize>, // Board with all tiles
-	pub matchmaking_state: MatchmakingState,  // Game key
 }
 
 impl<Tile, MaxGridSize> HexBoard<Tile, MaxGridSize>
@@ -64,7 +48,6 @@ where
 {
 	pub fn try_new<DefaultPlayerResources>(
 		size: usize,
-		matchmaking_state: MatchmakingState,
 	) -> Option<HexBoard<Tile, MaxGridSize>>
 	where
 		DefaultPlayerResources: Get<[ResourceUnit; 7]>,
@@ -82,17 +65,9 @@ where
 			Some(HexBoard::<Tile, MaxGridSize> {
 				resources: DefaultPlayerResources::get(),
 				hex_grid: new_hex_grid,
-				matchmaking_state,
 			})
 		} else {
 			None
-		}
-	}
-
-	pub fn get_game_id(&self) -> Option<GameId> {
-		match self.matchmaking_state {
-			MatchmakingState::Joined(game_id) => Some(game_id),
-			_ => None,
 		}
 	}
 

@@ -9,6 +9,8 @@ use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_std::{boxed::Box, vec::Vec};
 
+use sp_std::vec;
+
 use frame_support::traits::Get;
 
 #[cfg(test)]
@@ -42,6 +44,8 @@ pub mod pallet {
 
 	// important to use outside structs and consts
 	use super::*;
+
+	pub const SEED_LENGTH: usize = 16;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -183,6 +187,7 @@ impl<T: Config> Pallet<T> {
 
 		let mut result: Vec<T::AccountId> = Vec::new();
 		let mut brackets: Vec<Bracket> = Vec::new();
+		
 		// pass trough all brackets
 		for i in 0..Self::brackets_count() {
 			// skip if bracket is empty
@@ -213,6 +218,40 @@ impl<T: Config> Pallet<T> {
 				Self::deposit_event(Event::Popped(p));
 			}
 		}
+		
+		// return result
+		result
+	}
+
+	fn do_try_match_all_random(bracket: u8, seed: &[u8; SEED_LENGTH]) -> Vec<Vec<T::AccountId>> {
+		let mut queue = Self::queue_transient();
+		let max_players = T::AmountPlayers::get();
+		
+		let matches: u16 = queue.size(bracket) / max_players as u16;
+
+		let mut indexes: Vec<u16> = (0u16..matches).collect();
+
+		let mut result: Vec<Vec<T::AccountId>> = vec![vec![]; matches as usize];
+
+		for i in 0..(matches * max_players as u16) {
+			let indexes_length = indexes.len();
+
+			// Ensures that the index is always in bounds of `indexes`
+			let index_of_result_index = seed[i as usize] % indexes_length as u8;
+
+			let result_index = indexes[index_of_result_index as usize];
+
+			if let Some(p) = queue.pop(bracket) {
+				result[result_index as usize].push(p.account.clone());
+				Self::deposit_event(Event::Popped(p));
+
+				// Remove the index of the resulting match that is already full
+				if (result[result_index as usize]).len() == 2 {
+					indexes.remove(index_of_result_index as usize);
+				}
+			}
+		}
+		
 		// return result
 		result
 	}
@@ -255,6 +294,10 @@ impl<T: Config> MatchFunc<T::AccountId> for Pallet<T> {
 		Self::do_try_match()
 	}
 
+	fn try_match_all_random(bracket: u8, seed: &[u8; SEED_LENGTH]) -> Vec<Vec<T::AccountId>> {
+		Self::do_try_match_all_random(bracket, seed)
+	}
+
 	fn is_queued(account: T::AccountId) -> bool {
 		Self::do_is_queued(account)
 	}
@@ -280,6 +323,9 @@ pub trait MatchFunc<AccountId> {
 
 	/// try create a match
 	fn try_match() -> Vec<AccountId>;
+
+	/// try create all matches randomly
+	fn try_match_all_random(bracket: u8, seed: &[u8; SEED_LENGTH]) -> Vec<Vec<AccountId>>;
 
 	// return true if an account is queued in any bracket
 	fn is_queued(account: AccountId) -> bool;

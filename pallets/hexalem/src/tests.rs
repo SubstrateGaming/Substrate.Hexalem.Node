@@ -53,7 +53,7 @@ fn game_loop() {
 		.unwrap();
 		assert_eq!(hex_board.hex_grid, default_hex_grid);
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		// Assert that the correct event was deposited
 		System::assert_last_event(
@@ -289,12 +289,11 @@ fn test_resource_generation() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		HexalemModule::set_hex_board(
 			1,
 			HexBoard {
-				matchmaking_state: MatchmakingState::Joined(game_id),
 				hex_grid: new_hex_grid,
 				resources: [0, 1, 0, 0, 0, 0, 0],
 			},
@@ -351,13 +350,12 @@ fn test_saturate_99() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		// Set player resources to 99 and set a new hex_grid
 		HexalemModule::set_hex_board(
 			1,
 			HexBoard {
-				matchmaking_state: MatchmakingState::Joined(game_id),
 				hex_grid: new_hex_grid,
 				resources: [99; NUMBER_OF_RESOURCE_TYPES],
 			},
@@ -386,7 +384,7 @@ fn test_game_finishes_on_25th_round() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -397,7 +395,9 @@ fn test_game_finishes_on_25th_round() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
+
+		assert_eq!(matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
@@ -420,7 +420,7 @@ fn test_game_finishes_on_25th_round_3p() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -433,7 +433,9 @@ fn test_game_finishes_on_25th_round_3p() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+
+		assert_eq!(matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
@@ -464,7 +466,7 @@ fn test_game_force_finishes_on_25th_round_3p() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			System::set_block_number(
@@ -494,7 +496,9 @@ fn test_game_force_finishes_on_25th_round_3p() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+
+		assert_eq!(matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
@@ -523,7 +527,7 @@ fn test_force_finish_turn() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		// force_finish_turn can not be called before the BlocksToPlayLimit has been passed
 		assert_noop!(
@@ -562,7 +566,8 @@ fn play() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
 
 		assert_noop!(
 			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 12, buy_index: 0 }),
@@ -589,7 +594,6 @@ fn play() {
 		HexalemModule::set_hex_board(
 			1,
 			HexBoard {
-				matchmaking_state: MatchmakingState::Joined(game_id),
 				hex_grid: hex_board.hex_grid,
 				resources: [0; NUMBER_OF_RESOURCE_TYPES],
 			},
@@ -652,13 +656,12 @@ fn play_pattern() {
 		.try_into()
 		.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		// Set player resources to 0
 		HexalemModule::set_hex_board(
 			1,
 			HexBoard {
-				matchmaking_state: MatchmakingState::Joined(game_id),
 				hex_grid: new_hex_grid.clone(),
 				resources: [5; NUMBER_OF_RESOURCE_TYPES],
 			},
@@ -760,7 +763,7 @@ fn upgrade() {
 
 		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		let new_hex_grid: HexGridOf<TestRuntime> = vec![
 			HexalemTile(0),
@@ -795,7 +798,6 @@ fn upgrade() {
 		HexalemModule::set_hex_board(
 			1,
 			HexBoard {
-				matchmaking_state: MatchmakingState::Joined(game_id),
 				hex_grid: new_hex_grid,
 				resources: [10; NUMBER_OF_RESOURCE_TYPES],
 			},
@@ -867,7 +869,6 @@ fn upgrade() {
 			HexalemModule::set_hex_board(
 				1,
 				HexBoard {
-					matchmaking_state: MatchmakingState::Joined(game_id),
 					hex_grid: hex_board.hex_grid,
 					resources: [10; NUMBER_OF_RESOURCE_TYPES],
 				},
@@ -988,49 +989,49 @@ fn simple_2p_matchmaking() {
 		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let hex_board = hex_board_option.unwrap();
-
-		assert_eq!(
-			hex_board.resources,
-			<mock::TestRuntime as pallet::Config>::DefaultPlayerResources::get()
+		assert!(
+			hex_board_option.is_none()
 		);
 
-		let default_hex_grid: HexGridOf<TestRuntime> = vec![
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile::get_home(),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-			HexalemTile(0),
-		]
-		.try_into()
-		.unwrap();
-		assert_eq!(hex_board.hex_grid, default_hex_grid);
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
 
-		assert_eq!(hex_board.matchmaking_state, MatchmakingState::Matchmaking);
+		assert_eq!(matchmaking_state, MatchmakingState::Matchmaking);
 
 		assert_eq!(MatchmakerModule::queue_size(0), 1);
 
 		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(2)));
+
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+
+		assert_eq!(matchmaking_state, MatchmakingState::Matchmaking);
+
+		assert_eq!(MatchmakerModule::queue_size(0), 2);
+
+		assert_noop!(
+			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 11, buy_index: 0 }),
+			Error::<TestRuntime>::HexBoardNotInitialized,
+		);
+
+		assert_noop!(
+			HexalemModule::play(RuntimeOrigin::signed(2), Move { place_index: 11, buy_index: 0 }),
+			Error::<TestRuntime>::HexBoardNotInitialized,
+		);
+
+		assert_noop!(HexalemModule::accept_match(RuntimeOrigin::signed(1)), Error::<TestRuntime>::DidNotJoinGame);
+		assert_noop!(HexalemModule::accept_match(RuntimeOrigin::signed(2)), Error::<TestRuntime>::DidNotJoinGame);
+
+		System::set_block_number(10);
+		HexalemModule::on_initialize(10);
+
+		assert_noop!(
+			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 11, buy_index: 0 }),
+			Error::<TestRuntime>::HexBoardNotInitialized,
+		);
+
+		assert_ok!(HexalemModule::accept_match(RuntimeOrigin::signed(1)));
+		assert_ok!(HexalemModule::accept_match(RuntimeOrigin::signed(2)));
+
+		assert_noop!(HexalemModule::accept_match(RuntimeOrigin::signed(1)), Error::<TestRuntime>::HexBoardAlreadyInitialized);
 
 		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(2);
@@ -1073,11 +1074,13 @@ fn simple_2p_matchmaking() {
 		.unwrap();
 		assert_eq!(hex_board.hex_grid, default_hex_grid);
 
-		assert_ne!(hex_board.matchmaking_state, MatchmakingState::Matchmaking);
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+
+		assert_ne!(matchmaking_state, MatchmakingState::Matchmaking);
 
 		assert_eq!(MatchmakerModule::queue_size(0), 0);
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		let game_option = GameStorage::<TestRuntime>::get(game_id);
 
@@ -1103,6 +1106,10 @@ fn simple_2p_matchmaking() {
 		assert_noop!(
 			HexalemModule::queue(RuntimeOrigin::signed(2)),
 			Error::<TestRuntime>::AlreadyPlaying
+		);
+
+		assert_ok!(
+			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 11, buy_index: 0 })
 		);
 	});
 }
@@ -1166,7 +1173,7 @@ fn elo_2p_match() {
 
 		let mut hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		hex_board.resources = [99; NUMBER_OF_RESOURCE_TYPES];
 
@@ -1236,7 +1243,7 @@ fn elo_4p_match() {
 
 		let mut hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = hex_board.get_game_id().unwrap();
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 
 		hex_board.resources = [99; NUMBER_OF_RESOURCE_TYPES];
 
@@ -1278,10 +1285,12 @@ fn clean_hex_board_storage() {
 			Some(
 				HexBoardOf::<TestRuntime>::try_new::<
 					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25, MatchmakingState::Matchmaking)
+				>(25)
 				.unwrap(),
 			),
 		);
+
+		MatchmakingStateStorage::<TestRuntime>::set(1, MatchmakingState::Matchmaking);
 
 		assert_noop!(
 			HexalemModule::receive_rewards(RuntimeOrigin::signed(1)),
@@ -1293,10 +1302,12 @@ fn clean_hex_board_storage() {
 			Some(
 				HexBoardOf::<TestRuntime>::try_new::<
 					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25, MatchmakingState::Joined(Default::default()))
+				>(25)
 				.unwrap(),
 			),
 		);
+
+		MatchmakingStateStorage::<TestRuntime>::set(2, MatchmakingState::Joined(Default::default()));
 
 		assert_noop!(
 			HexalemModule::receive_rewards(RuntimeOrigin::signed(2)),
@@ -1308,11 +1319,55 @@ fn clean_hex_board_storage() {
 			Some(
 				HexBoardOf::<TestRuntime>::try_new::<
 					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25, MatchmakingState::Finished(Rewards::Winner))
+				>(25)
 				.unwrap(),
 			),
 		);
 
+		MatchmakingStateStorage::<TestRuntime>::set(3, MatchmakingState::Finished(Rewards::Winner));
+
 		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(3)));
+
+		// Can queue new game
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(3)));
+
+		HexBoardStorage::<TestRuntime>::set(
+			4,
+			Some(
+				HexBoardOf::<TestRuntime>::try_new::<
+					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
+				>(25)
+				.unwrap(),
+			),
+		);
+
+		MatchmakingStateStorage::<TestRuntime>::set(4, MatchmakingState::Finished(Rewards::Loser));
+
+		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(4)));
+
+		HexBoardStorage::<TestRuntime>::set(
+			5,
+			Some(
+				HexBoardOf::<TestRuntime>::try_new::<
+					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
+				>(25)
+				.unwrap(),
+			),
+		);
+
+		MatchmakingStateStorage::<TestRuntime>::set(5, MatchmakingState::Finished(Rewards::Draw));
+
+		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(5)));
+	});
+}
+
+#[test]
+fn clean_hex_board_without_accepting_match() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		MatchmakingStateStorage::<TestRuntime>::set(1, MatchmakingState::Finished(Rewards::Loser));
+
+		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(1)));
 	});
 }
