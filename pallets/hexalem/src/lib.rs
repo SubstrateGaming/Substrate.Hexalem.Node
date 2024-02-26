@@ -83,6 +83,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxTileSelection: Get<u32> + Parameter;
 
+		// Determines the period in blocks for initiating matchmaking
+		#[pallet::constant]
+		type MatchmakingPeriod: Get<u32>;
+
 		type Tile: Encode
 			+ Decode
 			+ TypeInfo
@@ -277,7 +281,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
-			if (n % 10u32.into()).is_zero() {
+			if (n % T::MatchmakingPeriod::get().into()).is_zero() {
 				// This might change with the introduction of ELO
 				let bracket: u8 = 0;
 

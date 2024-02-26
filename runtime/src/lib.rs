@@ -457,7 +457,7 @@ parameter_types! {
 
 	pub const HexalemTargetGoalGold: u8 = 10u8;
 	pub const HexalemTargetGoalHuman: u8 = 7u8;
-
+	pub const HexalemMatchmakingPeriod: u32 = 10u32;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -497,6 +497,7 @@ impl pallet_hexalem::Config for Runtime {
 	type TargetGoalHuman = HexalemTargetGoalHuman;
 	type Matchmaker = MatchmakerModule;
 	type Elo = EloModule;
+	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

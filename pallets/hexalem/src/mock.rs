@@ -195,6 +195,7 @@ parameter_types! {
 
 	pub const HexalemTargetGoalGold: u8 = 10u8;
 	pub const HexalemTargetGoalHuman: u8 = 7u8;
+	pub const HexalemMatchmakingPeriod: u32 = 10u32;
 }
 
 // Configure a mock runtime to test the pallet.
@@ -272,6 +273,7 @@ impl pallet_hexalem::Config for TestRuntime {
 	type TargetGoalGold = HexalemTargetGoalGold;
 	type TargetGoalHuman = HexalemTargetGoalHuman;
 	type Matchmaker = MatchmakerModule;
+	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 	type Elo = EloModule;
 }
 
