@@ -187,7 +187,7 @@ impl<T: Config> Pallet<T> {
 
 		let mut result: Vec<T::AccountId> = Vec::new();
 		let mut brackets: Vec<Bracket> = Vec::new();
-		
+
 		// pass trough all brackets
 		for i in 0..Self::brackets_count() {
 			// skip if bracket is empty
@@ -218,7 +218,7 @@ impl<T: Config> Pallet<T> {
 				Self::deposit_event(Event::Popped(p));
 			}
 		}
-		
+
 		// return result
 		result
 	}
@@ -226,7 +226,7 @@ impl<T: Config> Pallet<T> {
 	fn do_try_match_all_random(bracket: u8, seed: &[u8; SEED_LENGTH]) -> Vec<Vec<T::AccountId>> {
 		let mut queue = Self::queue_transient();
 		let max_players = T::AmountPlayers::get();
-		
+
 		let matches: u16 = queue.size(bracket) / max_players as u16;
 
 		let mut indexes: Vec<u16> = (0u16..matches).collect();
@@ -251,7 +251,7 @@ impl<T: Config> Pallet<T> {
 				}
 			}
 		}
-		
+
 		// return result
 		result
 	}

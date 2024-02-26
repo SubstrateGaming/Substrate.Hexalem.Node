@@ -46,9 +46,7 @@ where
 	Tile: Default + Clone + GetTileInfo,
 	MaxGridSize: Get<u32>,
 {
-	pub fn try_new<DefaultPlayerResources>(
-		size: usize,
-	) -> Option<HexBoard<Tile, MaxGridSize>>
+	pub fn try_new<DefaultPlayerResources>(size: usize) -> Option<HexBoard<Tile, MaxGridSize>>
 	where
 		DefaultPlayerResources: Get<[ResourceUnit; 7]>,
 	{

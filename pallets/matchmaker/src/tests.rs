@@ -1,6 +1,5 @@
 use crate::{mock::*, Error};
-use frame_support::StorageHasher;
-use frame_support::Blake2_128;
+use frame_support::{Blake2_128, StorageHasher};
 use parity_scale_codec::Encode;
 
 #[test]
