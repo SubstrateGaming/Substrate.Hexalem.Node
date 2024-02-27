@@ -1,6 +1,6 @@
 use crate::{mock::*, types::*, Event, *};
 use frame_support::{assert_noop, assert_ok};
-use pallet_elo::Event as EloEvent;
+use pallet_elo::{Event as EloEvent, RatingStorage};
 
 #[test]
 fn game_loop() {
@@ -1109,6 +1109,201 @@ fn simple_2p_matchmaking() {
 			RuntimeOrigin::signed(1),
 			Move { place_index: 11, buy_index: 0 }
 		));
+	});
+}
+
+#[test]
+fn multiple_brackets_2p_matchmaking() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		RatingStorage::<TestRuntime>::set(1, 1000);
+		RatingStorage::<TestRuntime>::set(2, 1500);
+		RatingStorage::<TestRuntime>::set(3, 2000);
+
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(1)));
+
+		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(1);
+
+		assert!(hex_board_option.is_none());
+
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
+
+		assert_eq!(matchmaking_state, MatchmakingState::Matchmaking);
+
+		assert_eq!(MatchmakerModule::queue_size(0), 1);
+
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(2)));
+
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+
+		assert_eq!(matchmaking_state, MatchmakingState::Matchmaking);
+
+		assert_eq!(MatchmakerModule::queue_size(0), 1);
+		assert_eq!(MatchmakerModule::queue_size(1), 1);
+		assert_eq!(MatchmakerModule::all_queue_size(), 2);
+
+		assert_noop!(
+			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 11, buy_index: 0 }),
+			Error::<TestRuntime>::HexBoardNotInitialized,
+		);
+
+		assert_noop!(
+			HexalemModule::play(RuntimeOrigin::signed(2), Move { place_index: 11, buy_index: 0 }),
+			Error::<TestRuntime>::HexBoardNotInitialized,
+		);
+
+		assert_noop!(
+			HexalemModule::accept_match(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::DidNotJoinGame
+		);
+		assert_noop!(
+			HexalemModule::accept_match(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::DidNotJoinGame
+		);
+
+		System::set_block_number(10);
+		HexalemModule::on_initialize(10);
+
+		assert_noop!(
+			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 11, buy_index: 0 }),
+			Error::<TestRuntime>::HexBoardNotInitialized,
+		);
+
+		assert_eq!(MatchmakerModule::queue_size(0), 1);
+		assert_eq!(MatchmakerModule::queue_size(1), 1);
+		assert_eq!(MatchmakerModule::all_queue_size(), 2);
+
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(4)));
+
+		System::set_block_number(20);
+		HexalemModule::on_initialize(20);
+
+		assert_ok!(HexalemModule::accept_match(RuntimeOrigin::signed(1)));
+		assert_ok!(HexalemModule::accept_match(RuntimeOrigin::signed(4)));
+
+		assert_noop!(
+			HexalemModule::accept_match(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::HexBoardAlreadyInitialized
+		);
+
+		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(4);
+
+		let hex_board = hex_board_option.unwrap();
+
+		assert_eq!(
+			hex_board.resources,
+			<mock::TestRuntime as pallet::Config>::DefaultPlayerResources::get()
+		);
+
+		let default_hex_grid: HexGridOf<TestRuntime> = vec![
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile::get_home(),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+			HexalemTile(0),
+		]
+		.try_into()
+		.unwrap();
+		assert_eq!(hex_board.hex_grid, default_hex_grid);
+
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(4);
+
+		assert_ne!(matchmaking_state, MatchmakingState::Matchmaking);
+
+		assert_eq!(MatchmakerModule::queue_size(0), 0);
+		assert_eq!(MatchmakerModule::queue_size(1), 1);
+
+		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let game = game_option.unwrap();
+
+		assert_eq!(game.players, vec![1, 4]);
+
+		assert_eq!(game.get_player_turn(), 0);
+
+		assert!(!game.get_played());
+
+		assert_eq!(game.get_round(), 0);
+
+		assert_eq!(game.get_selection_size(), 2);
+
+		assert_eq!(game.get_state(), GameState::Playing);
+
+		assert_noop!(
+			HexalemModule::queue(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::AlreadyPlaying
+		);
+
+		assert_noop!(
+			HexalemModule::queue(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::AlreadyPlaying
+		);
+
+		assert_noop!(
+			HexalemModule::queue(RuntimeOrigin::signed(4)),
+			Error::<TestRuntime>::AlreadyPlaying
+		);
+
+		assert_ok!(HexalemModule::play(
+			RuntimeOrigin::signed(1),
+			Move { place_index: 11, buy_index: 0 }
+		));
+	});
+}
+
+#[test]
+fn multiple_brackets_2p_auto_matchmake() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		RatingStorage::<TestRuntime>::set(1, 1000);
+		RatingStorage::<TestRuntime>::set(2, 1500);
+		RatingStorage::<TestRuntime>::set(3, 2000);
+
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(1)));
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(2)));
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(3)));
+
+		for p in 4..20 {
+			RatingStorage::<TestRuntime>::set(p, 1500);
+			assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(p)));
+		}
+
+		assert_ne!(MatchmakingStateStorage::<TestRuntime>::get(4), MatchmakingState::Matchmaking);
+
+		assert_ne!(MatchmakingStateStorage::<TestRuntime>::get(8), MatchmakingState::Matchmaking);
+
+		assert_eq!(MatchmakingStateStorage::<TestRuntime>::get(1), MatchmakingState::Matchmaking);
+		assert_eq!(MatchmakingStateStorage::<TestRuntime>::get(3), MatchmakingState::Matchmaking);
+		assert_eq!(MatchmakingStateStorage::<TestRuntime>::get(16), MatchmakingState::Matchmaking);
+		assert_eq!(MatchmakingStateStorage::<TestRuntime>::get(19), MatchmakingState::Matchmaking);
 	});
 }
 

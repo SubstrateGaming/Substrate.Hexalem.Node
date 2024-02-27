@@ -1,6 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::cmp;
+use frame_support::{Blake2_128, Blake2_256};
+use parity_scale_codec::Encode;
 
 use crate::vec::Vec;
 use frame_support::pallet_prelude::Hooks;
@@ -32,8 +34,8 @@ use frame_support::{
 };
 use scale_info::prelude::vec;
 
-use pallet_elo::EloFunc;
-use pallet_matchmaker::MatchFunc;
+use pallet_elo::{EloFunc, Rating};
+use pallet_matchmaker::{MatchFunc, MatchingType};
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -130,6 +132,8 @@ pub mod pallet {
 		type Matchmaker: MatchFunc<Self::AccountId>;
 
 		type Elo: EloFunc<Self::AccountId, Self::MaxPlayers>;
+
+		type MatchingType: Get<MatchingType>;
 	}
 
 	#[pallet::storage]
@@ -291,34 +295,33 @@ pub mod pallet {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			if (n % T::MatchmakingPeriod::get().into()).is_zero() {
 				// This might change with the introduction of ELO
-				let bracket: u8 = 0;
+				match T::MatchingType::get() {
+					MatchingType::Mix => {
+						let bracket: u8 = 0;
 
-				// Random seed
-				let seed = Blake2_128::hash(&n.encode());
+						// Might be changed
+						let grid_size: u8 = 25;
 
-				for potential_players in T::Matchmaker::try_match_all_random(bracket, &seed) {
-					// Random GameId
-					// I used `potential_players` to ensure that even if 2 independent players
-					// wanted to create game in the same block, they would be able to.
-					let game_id: GameId = Blake2_256::hash(&(&potential_players[0], &n).encode());
+						Self::matchmake(bracket, n, grid_size);
 
-					for player in &potential_players {
-						MatchmakingStateStorage::<T>::set(
-							player,
-							MatchmakingState::Joined(game_id),
-						);
-					}
+						T::DbWeight::get().reads_writes(1, 1) // Maybe adjust the weight
+					},
+					MatchingType::Same => {
+						//<Matchmaker as pallet_matchmaker::Config>::AmountBrackets
 
-					// Might be changed
-					let grid_size: u8 = 25;
+						for bracket in 0..T::Matchmaker::get_number_of_brackets() {
+							// Might be changed
+							let grid_size: u8 = 25;
 
-					// Create new game
-					Self::do_create_new_game(game_id, n, potential_players, grid_size);
+							Self::matchmake(bracket, n, grid_size);
+						}
 
-					// Maybe adjust the weight
+						T::DbWeight::get().reads_writes(1, 1) // Maybe adjust the weight
+					},
+					_ => {
+						T::DbWeight::get().reads_writes(1, 1) // Maybe adjust the weight
+					},
 				}
-
-				T::DbWeight::get().reads_writes(1, 1) // Maybe adjust the weight
 			} else {
 				T::DbWeight::get().reads_writes(1, 1) // Return the weight of the operation
 			}
@@ -398,8 +401,9 @@ pub mod pallet {
 
 			MatchmakingStateStorage::<T>::set(&who, MatchmakingState::Matchmaking);
 
-			// This might change with the introduction of ELO
-			let bracket: u8 = 0;
+			let elo: u16 = T::Elo::get_rating(&who);
+
+			let bracket: u8 = Self::get_player_bracket(elo);
 
 			// Add player to queue, duplicate check is done in matchmaker.
 			// Makes sure that the player is not playing
@@ -408,36 +412,10 @@ pub mod pallet {
 			if T::Matchmaker::queue_size(bracket) >= 10 {
 				let current_block_number = <frame_system::Pallet<T>>::block_number();
 
-				// Random seed
-				let seed = Blake2_128::hash(&current_block_number.encode());
+				// Might be changed
+				let grid_size: u8 = 25;
 
-				for potential_players in T::Matchmaker::try_match_all_random(bracket, &seed) {
-					// Random GameId
-					// I used `potential_players` to ensure that even if 2 independent players
-					// wanted to create game in the same block, they would be able to.
-					let game_id: GameId =
-						Blake2_256::hash(&(&potential_players[0], &current_block_number).encode());
-
-					for player in &potential_players {
-						MatchmakingStateStorage::<T>::set(
-							player,
-							MatchmakingState::Joined(game_id),
-						);
-					}
-
-					// Might be changed
-					let grid_size: u8 = 25;
-
-					// Create new game
-					Self::do_create_new_game(
-						game_id,
-						current_block_number,
-						potential_players,
-						grid_size,
-					);
-
-					// Maybe adjust the weight
-				}
+				Self::matchmake(bracket, current_block_number, grid_size);
 			}
 
 			Ok(())
@@ -860,6 +838,28 @@ pub mod pallet {
 
 // Other helper methods
 impl<T: Config> Pallet<T> {
+	fn matchmake(bracket: u8, current_block_number: BlockNumberFor<T>, grid_size: u8) {
+		// Random seed
+		let seed = Blake2_128::hash(&current_block_number.encode());
+
+		for potential_players in T::Matchmaker::try_match_all_random(bracket, &seed) {
+			// Random GameId
+			// I used `potential_players` to ensure that even if 2 independent players
+			// wanted to create game in the same block, they would be able to.
+			let game_id: GameId =
+				Blake2_256::hash(&(&potential_players[0], &current_block_number).encode());
+
+			for player in &potential_players {
+				MatchmakingStateStorage::<T>::set(player, MatchmakingState::Joined(game_id));
+			}
+
+			// Create new game
+			Self::do_create_new_game(game_id, current_block_number, potential_players, grid_size);
+
+			// Maybe adjust the weight
+		}
+	}
+
 	/// Instancializes a new Game
 	fn do_create_new_game(
 		game_id: GameId,
@@ -1354,6 +1354,18 @@ impl<T: Config> Pallet<T> {
 
 	fn saturate_at_99(x: u8) -> u8 {
 		cmp::min(x, 99)
+	}
+
+	fn get_player_bracket(elo: Rating) -> u8 {
+		if T::MatchingType::get() == MatchingType::Mix {
+			return 0;
+		}
+
+		match elo {
+			0..=1299 => 0,
+			1300..=1599 => 1,
+			_ => 2,
+		}
 	}
 
 	#[cfg(any(feature = "std", feature = "runtime-benchmarks", test))]

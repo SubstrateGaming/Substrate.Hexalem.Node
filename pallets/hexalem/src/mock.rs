@@ -7,6 +7,7 @@ use pallet_hexalem::{
 	GetTileInfo, ResourceAmount, ResourceProductions, ResourceType, ResourceUnit, TileCost,
 	TilePattern, TileType, NUMBER_OF_RESOURCE_TYPES, NUMBER_OF_TILE_TYPES,
 };
+use pallet_matchmaker::MatchingType;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
@@ -196,6 +197,7 @@ parameter_types! {
 	pub const HexalemTargetGoalGold: u8 = 10u8;
 	pub const HexalemTargetGoalHuman: u8 = 7u8;
 	pub const HexalemMatchmakingPeriod: u32 = 10u32;
+	pub const HexalemMatchingType: MatchingType = MatchingType::Same;
 }
 
 // Configure a mock runtime to test the pallet.
@@ -212,7 +214,7 @@ frame_support::construct_runtime!(
 // matchmaker parameters
 parameter_types! {
 	pub const AmountPlayers: u8 = 2;
-	pub const AmountBrackets: u8 = 2;
+	pub const AmountBrackets: u8 = 3;
 }
 
 /// pallet used for matchmaking in pallet-rps.
@@ -273,6 +275,7 @@ impl pallet_hexalem::Config for TestRuntime {
 	type TargetGoalGold = HexalemTargetGoalGold;
 	type TargetGoalHuman = HexalemTargetGoalHuman;
 	type Matchmaker = MatchmakerModule;
+	type MatchingType = HexalemMatchingType;
 	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 	type Elo = EloModule;
 }

@@ -110,14 +110,8 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn key_present)]
-	pub type KeyPresentMap<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		T::AccountId,
-		bool,
-		ValueQuery,
-		KeyPresentDefault
-	>;
+	pub type KeyPresentMap<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, bool, ValueQuery, KeyPresentDefault>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://substrate.dev/docs/en/knowledgebase/runtime/events
@@ -311,6 +305,10 @@ impl<T: Config> MatchFunc<T::AccountId> for Pallet<T> {
 	fn all_queue_size() -> BufferIndex {
 		Self::do_all_queue_size()
 	}
+
+	fn get_number_of_brackets() -> u8 {
+		T::AmountBrackets::get()
+	}
 }
 
 pub trait MatchFunc<AccountId> {
@@ -337,4 +335,7 @@ pub trait MatchFunc<AccountId> {
 
 	// return total size of all queued accounts in all brackets
 	fn all_queue_size() -> BufferIndex;
+
+	// return the number of brackets
+	fn get_number_of_brackets() -> u8;
 }

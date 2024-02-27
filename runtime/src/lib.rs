@@ -11,6 +11,7 @@ use pallet_hexalem::{
 	GetTileInfo, ResourceAmount, ResourceProductions, ResourceType, ResourceUnit, TileCost,
 	TilePattern, TileType, NUMBER_OF_RESOURCE_TYPES, NUMBER_OF_TILE_TYPES,
 };
+use pallet_matchmaker::MatchingType;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_api::impl_runtime_apis;
@@ -458,6 +459,8 @@ parameter_types! {
 	pub const HexalemTargetGoalGold: u8 = 10u8;
 	pub const HexalemTargetGoalHuman: u8 = 7u8;
 	pub const HexalemMatchmakingPeriod: u32 = 10u32;
+
+	pub const HexalemMatchingType: MatchingType = MatchingType::Mix;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -498,6 +501,7 @@ impl pallet_hexalem::Config for Runtime {
 	type Matchmaker = MatchmakerModule;
 	type Elo = EloModule;
 	type MatchmakingPeriod = HexalemMatchmakingPeriod;
+	type MatchingType = HexalemMatchingType;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

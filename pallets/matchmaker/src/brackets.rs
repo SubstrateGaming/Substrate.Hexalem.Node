@@ -149,7 +149,7 @@ where
 		N::insert(&item_key, true);
 
 		// insert the item key and the item
-		
+
 		M::insert(bracket, v_end, item_key);
 
 		// this will intentionally overflow and wrap around when bonds_end

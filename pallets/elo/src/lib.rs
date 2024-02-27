@@ -37,7 +37,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::type_value]
-	pub fn DefaultRating() -> u16 {
+	pub fn DefaultRating() -> Rating {
 		1000u16
 	}
 
@@ -182,10 +182,16 @@ impl<T: Config> EloFunc<AccountIdOf<T>, <T as Config>::MaxPlayers> for Pallet<T>
 	) {
 		Self::do_update_ratings(winner, losers)
 	}
+
+	fn get_rating(player: &AccountIdOf<T>) -> Rating {
+		RatingStorage::<T>::get(player)
+	}
 }
 
 pub trait EloFunc<AccountId, MaxAccounts> {
 	fn update_rating(winner: &AccountId, loser: &AccountId);
 
 	fn update_ratings(winner: &AccountId, losers: &BoundedVec<AccountId, MaxAccounts>);
+
+	fn get_rating(player: &AccountId) -> Rating;
 }

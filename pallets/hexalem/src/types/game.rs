@@ -2,7 +2,6 @@ use super::*;
 
 #[derive(Encode, Decode, TypeInfo, MaxEncodedLen, PartialEq, Copy, Clone, Debug)]
 pub enum GameState {
-	Matchmaking,
 	Playing,
 	Finished { winner: Option<u8> }, // Ready to reward players
 }
