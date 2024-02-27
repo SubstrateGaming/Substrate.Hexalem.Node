@@ -13,10 +13,9 @@ use parity_scale_codec::{Codec, EncodeLike};
 use sp_std::vec::Vec;
 
 /// Trait object presenting the brackets interface.
-pub trait BracketsTrait<ItemKey, Item>
+pub trait BracketsTrait<ItemKey>
 where
 	ItemKey: Codec + EncodeLike,
-	Item: Codec + EncodeLike,
 {
 	/// Store all changes made in the underlying storage.
 	///
@@ -25,11 +24,11 @@ where
 	/// Implementation note: Call in `drop` to increase ergonomics.
 	fn commit(&self);
 	/// Push an item onto the end of the queue.
-	fn push(&mut self, b: Bracket, j: ItemKey, i: Item) -> bool;
+	fn push(&mut self, b: Bracket, j: ItemKey) -> bool;
 	/// Pop an item from the start of the queue.
 	///
 	/// Returns `None` if the queue is empty.
-	fn pop(&mut self, b: Bracket) -> Option<Item>;
+	fn pop(&mut self, b: Bracket) -> Option<ItemKey>;
 	/// Return whether the queue is empty.
 	fn is_empty(&self, b: Bracket) -> bool;
 	/// Return the size of the brackets queue.
@@ -67,32 +66,30 @@ pub type BufferIndexVector = Vec<(BufferIndex, BufferIndex)>;
 pub type Bracket = u8;
 
 /// Transient backing data that is the backbone of the trait object.
-pub struct BracketsTransient<ItemKey, Item, C, B, M, N>
+pub struct BracketsTransient<ItemKey, C, B, M, N>
 where
 	ItemKey: Codec + EncodeLike,
-	Item: Codec + EncodeLike,
 	C: StorageValue<Bracket, Query = Bracket>,
 	B: StorageMap<Bracket, (BufferIndex, BufferIndex), Query = (BufferIndex, BufferIndex)>,
 	M: StorageDoubleMap<Bracket, BufferIndex, ItemKey, Query = Option<ItemKey>>,
-	N: StorageDoubleMap<Bracket, ItemKey, Item, Query = Option<Item>>,
+	N: StorageMap<ItemKey, bool, Query = bool>,
 {
 	index_vector: BufferIndexVector,
-	_phantom: PhantomData<(ItemKey, Item, C, B, M, N)>,
+	_phantom: PhantomData<(ItemKey, C, B, M, N)>,
 }
 
-impl<ItemKey, Item, C, B, M, N> BracketsTransient<ItemKey, Item, C, B, M, N>
+impl<ItemKey, C, B, M, N> BracketsTransient<ItemKey, C, B, M, N>
 where
 	ItemKey: Codec + EncodeLike,
-	Item: Codec + EncodeLike,
 	C: StorageValue<Bracket, Query = Bracket>,
 	B: StorageMap<Bracket, (BufferIndex, BufferIndex), Query = (BufferIndex, BufferIndex)>,
 	M: StorageDoubleMap<Bracket, BufferIndex, ItemKey, Query = Option<ItemKey>>,
-	N: StorageDoubleMap<Bracket, ItemKey, Item, Query = Option<Item>>,
+	N: StorageMap<ItemKey, bool, Query = bool>,
 {
 	/// Create a new `BracketsTransient` that backs the brackets implementation.
 	///
 	/// Initializes itself from the bounds storage `B`.
-	pub fn new() -> BracketsTransient<ItemKey, Item, C, B, M, N> {
+	pub fn new() -> BracketsTransient<ItemKey, C, B, M, N> {
 		// get brackets count
 		let brackets_count = C::get();
 
@@ -107,31 +104,28 @@ where
 	}
 }
 
-impl<ItemKey, Item, C, B, M, N> Drop for BracketsTransient<ItemKey, Item, C, B, M, N>
+impl<ItemKey, C, B, M, N> Drop for BracketsTransient<ItemKey, C, B, M, N>
 where
 	ItemKey: Codec + EncodeLike,
-	Item: Codec + EncodeLike,
 	C: StorageValue<Bracket, Query = Bracket>,
 	B: StorageMap<Bracket, (BufferIndex, BufferIndex), Query = (BufferIndex, BufferIndex)>,
 	M: StorageDoubleMap<Bracket, BufferIndex, ItemKey, Query = Option<ItemKey>>,
-	N: StorageDoubleMap<Bracket, ItemKey, Item, Query = Option<Item>>,
+	N: StorageMap<ItemKey, bool, Query = bool>,
 {
 	/// Commit on `drop`.
 	fn drop(&mut self) {
-		<Self as BracketsTrait<ItemKey, Item>>::commit(self);
+		<Self as BracketsTrait<ItemKey>>::commit(self);
 	}
 }
 
 /// Brackets implementation based on `BracketsTransient`
-impl<ItemKey, Item, C, B, M, N> BracketsTrait<ItemKey, Item>
-	for BracketsTransient<ItemKey, Item, C, B, M, N>
+impl<ItemKey, C, B, M, N> BracketsTrait<ItemKey> for BracketsTransient<ItemKey, C, B, M, N>
 where
 	ItemKey: Codec + EncodeLike,
-	Item: Codec + EncodeLike,
 	C: StorageValue<Bracket, Query = Bracket>,
 	B: StorageMap<Bracket, (BufferIndex, BufferIndex), Query = (BufferIndex, BufferIndex)>,
 	M: StorageDoubleMap<Bracket, BufferIndex, ItemKey, Query = Option<ItemKey>>,
-	N: StorageDoubleMap<Bracket, ItemKey, Item, Query = Option<Item>>,
+	N: StorageMap<ItemKey, bool, Query = bool>,
 {
 	/// Commit the (potentially) changed bounds to storage.
 	fn commit(&self) {
@@ -145,18 +139,17 @@ where
 	/// Push an item onto the end of the queue.
 	///
 	/// Will insert the new item, but will not update the bounds in storage.
-	fn push(&mut self, bracket: Bracket, item_key: ItemKey, item: Item) -> bool {
+	fn push(&mut self, bracket: Bracket, item_key: ItemKey) -> bool {
 		let (mut v_start, mut v_end) = self.index_vector[bracket as usize];
 
-		// ensure that the key is not queued
-		for i in 0..self.index_vector.len() {
-			if N::contains_key(i as Bracket, &item_key) {
-				return false;
-			}
+		// Handle duplicates
+		if N::contains_key(&item_key) {
+			return false;
 		}
+		N::insert(&item_key, true);
 
 		// insert the item key and the item
-		N::insert(bracket, &item_key, item);
+		
 		M::insert(bracket, v_end, item_key);
 
 		// this will intentionally overflow and wrap around when bonds_end
@@ -176,20 +169,21 @@ where
 	/// Pop an item from the start of the queue.
 	///
 	/// Will remove the item, but will not update the bounds in storage.
-	fn pop(&mut self, bracket: Bracket) -> Option<Item> {
+	fn pop(&mut self, bracket: Bracket) -> Option<ItemKey> {
 		if self.is_empty(bracket) {
 			return None;
 		}
 
 		let (mut v_start, v_end) = self.index_vector[bracket as usize];
 
-		M::take(bracket, v_start)
-			.and_then(|item_key| N::take(bracket, item_key))
-			.map(|item| {
-				v_start = v_start.wrapping_add(1 as u16);
-				self.index_vector[bracket as usize] = (v_start, v_end);
-				item
-			})
+		M::take(bracket, v_start).map(|item| {
+			// Handle duplicates
+			N::remove(&item);
+
+			v_start = v_start.wrapping_add(1 as u16);
+			self.index_vector[bracket as usize] = (v_start, v_end);
+			item
+		})
 	}
 
 	/// Return whether to consider the queue empty.
@@ -212,13 +206,6 @@ where
 
 	/// Return whether the item_key is queued or not.
 	fn is_queued(&self, item_key: ItemKey) -> bool {
-		// check all brackets if key is queued
-		for i in 0..self.index_vector.len() {
-			if N::contains_key(i as Bracket, &item_key) {
-				return true;
-			}
-		}
-
-		false
+		N::contains_key(item_key)
 	}
 }

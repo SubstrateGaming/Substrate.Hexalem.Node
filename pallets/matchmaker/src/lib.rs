@@ -40,7 +40,7 @@ pub struct PlayerStruct<AccountId> {
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::pallet_prelude::{ValueQuery, *};
 
 	// important to use outside structs and consts
 	use super::*;
@@ -103,16 +103,20 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	#[pallet::type_value]
+	pub fn KeyPresentDefault() -> bool {
+		false
+	}
+
 	#[pallet::storage]
-	#[pallet::getter(fn key_value)]
-	pub type BracketKeyValueMap<T: Config> = StorageDoubleMap<
+	#[pallet::getter(fn key_present)]
+	pub type KeyPresentMap<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		Bracket,
-		Blake2_128Concat,
 		T::AccountId,
-		PlayerStruct<T::AccountId>,
-		OptionQuery,
+		bool,
+		ValueQuery,
+		KeyPresentDefault
 	>;
 
 	// Pallets use events to inform users when important changes are made.
@@ -121,9 +125,9 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Queued event
-		Queued(PlayerStruct<T::AccountId>),
+		Queued(T::AccountId),
 		/// Popped event
-		Popped(PlayerStruct<T::AccountId>),
+		Popped(T::AccountId),
 	}
 
 	// Errors inform users that something went wrong.
@@ -142,27 +146,25 @@ impl<T: Config> Pallet<T> {
 	///
 	/// Constructs a ringbuffer transient and returns it as a boxed trait object.
 	/// See [this part of the Rust book](https://doc.rust-lang.org/book/ch17-02-trait-objects.html#trait-objects-perform-dynamic-dispatch)
-	fn queue_transient() -> Box<dyn BracketsTrait<T::AccountId, PlayerStruct<T::AccountId>>> {
+	fn queue_transient() -> Box<dyn BracketsTrait<T::AccountId>> {
 		Box::new(BracketsTransient::<
 			T::AccountId,
-			PlayerStruct<T::AccountId>,
 			BracketsCount<T>,
 			BracketIndices<T>,
 			BracketIndexKeyMap<T>,
-			BracketKeyValueMap<T>,
+			KeyPresentMap<T>,
 		>::new())
 	}
 
 	fn do_add_queue(account: T::AccountId, bracket: u8) -> Result<(), sp_runtime::DispatchError> {
 		let mut queue = Self::queue_transient();
 
-		let player = PlayerStruct { account };
 		// duplicate check if we can add key to the queue
-		if !queue.push(bracket, player.account.clone(), player.clone()) {
+		if !queue.push(bracket, account.clone()) {
 			return Err(Error::<T>::AlreadyQueued.into());
 		}
 
-		Self::deposit_event(Event::Queued(player));
+		Self::deposit_event(Event::Queued(account));
 
 		Ok(())
 	}
@@ -213,9 +215,9 @@ impl<T: Config> Pallet<T> {
 
 		// pop from the harvested brackets players
 		for bracket in brackets {
-			if let Some(p) = queue.pop(bracket) {
-				result.push(p.account.clone());
-				Self::deposit_event(Event::Popped(p));
+			if let Some(account) = queue.pop(bracket) {
+				result.push(account.clone());
+				Self::deposit_event(Event::Popped(account));
 			}
 		}
 
@@ -241,9 +243,9 @@ impl<T: Config> Pallet<T> {
 
 			let result_index = indexes[index_of_result_index as usize];
 
-			if let Some(p) = queue.pop(bracket) {
-				result[result_index as usize].push(p.account.clone());
-				Self::deposit_event(Event::Popped(p));
+			if let Some(account) = queue.pop(bracket) {
+				result[result_index as usize].push(account.clone());
+				Self::deposit_event(Event::Popped(account));
 
 				// Remove the index of the resulting match that is already full
 				if (result[result_index as usize]).len() == 2 {
