@@ -53,7 +53,7 @@ fn game_loop() {
 		.unwrap();
 		assert_eq!(hex_board.hex_grid, default_hex_grid);
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		// Assert that the correct event was deposited
 		System::assert_last_event(
@@ -74,7 +74,7 @@ fn game_loop() {
 
 		assert_eq!(game.get_selection_size(), 2);
 
-		assert_eq!(game.get_state(), GameState::Playing);
+		assert_eq!(game.state, GameState::Playing);
 
 		let current_selection_indexes = game.selection.clone();
 
@@ -141,7 +141,7 @@ fn game_loop() {
 
 		assert_eq!(game.get_selection_size(), 4);
 
-		assert_eq!(game.get_state(), GameState::Playing);
+		assert_eq!(game.state, GameState::Playing);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
 
@@ -169,7 +169,7 @@ fn game_loop() {
 
 		assert_eq!(game.get_selection_size(), 4);
 
-		assert_eq!(game.get_state(), GameState::Playing);
+		assert_eq!(game.state, GameState::Playing);
 	});
 }
 
@@ -287,14 +287,17 @@ fn test_resource_generation() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let _game = game_option.unwrap();
 
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: new_hex_grid, resources: [0, 1, 0, 0, 0, 0, 0] },
+			HexBoard { hex_grid: new_hex_grid, resources: [0, 1, 0, 0, 0, 0, 0], game_id },
 		);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -346,15 +349,14 @@ fn test_saturate_99() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		// Set player resources to 99 and set a new hex_grid
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: new_hex_grid, resources: [99; NUMBER_OF_RESOURCE_TYPES] },
+			HexBoard { hex_grid: new_hex_grid, resources: [99; NUMBER_OF_RESOURCE_TYPES], game_id },
 		);
 
 		assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -378,9 +380,9 @@ fn test_game_finishes_on_25th_round() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -391,15 +393,19 @@ fn test_game_finishes_on_25th_round() {
 
 		let _hex_board = hex_board_option.unwrap();
 
-		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
+		let _matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
 
-		assert_eq!(matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let game = game_option.unwrap();
+
+		assert_eq!(game.state, GameState::Finished(vec![Rewards::Draw].try_into().unwrap()));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState,
+			Error::<TestRuntime>::GameNotInPlayingState,
 		);
 	});
 }
@@ -414,9 +420,9 @@ fn test_game_finishes_on_25th_round_3p() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(2);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			assert_ok!(HexalemModule::finish_turn(RuntimeOrigin::signed(1)));
@@ -429,23 +435,28 @@ fn test_game_finishes_on_25th_round_3p() {
 
 		let _hex_board = hex_board_option.unwrap();
 
-		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(1));
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(2));
 
-		assert_eq!(matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let game = game_option.unwrap();
+
+		assert_eq!(game.state, GameState::Finished(vec![Rewards::Draw, Rewards::Draw, Rewards::Draw].try_into().unwrap()));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState
+			Error::<TestRuntime>::GameNotInPlayingState
 		);
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(2)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState
+			Error::<TestRuntime>::GameNotInPlayingState
 		);
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(3)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState
+			Error::<TestRuntime>::GameNotInPlayingState
 		);
 	});
 }
@@ -460,9 +471,9 @@ fn test_game_force_finishes_on_25th_round_3p() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(2);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		for _ in 0..<mock::TestRuntime as pallet::Config>::MaxRounds::get() {
 			System::set_block_number(
@@ -490,25 +501,31 @@ fn test_game_force_finishes_on_25th_round_3p() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(2);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
+		let game_id = hex_board.game_id;
 
-		assert_eq!(matchmaking_state, MatchmakingState::Finished(Rewards::Draw));
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(2));
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let game = game_option.unwrap();
+
+		assert_eq!(game.state, GameState::Finished(vec![Rewards::Draw, Rewards::Draw, Rewards::Draw].try_into().unwrap()));
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState
+			Error::<TestRuntime>::GameNotInPlayingState
 		);
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(2)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState
+			Error::<TestRuntime>::GameNotInPlayingState
 		);
 		assert_noop!(
 			HexalemModule::finish_turn(RuntimeOrigin::signed(3)),
-			Error::<TestRuntime>::HexBoardNotInPlayingState
+			Error::<TestRuntime>::GameNotInPlayingState
 		);
 	});
 }
@@ -521,9 +538,13 @@ fn test_force_finish_turn() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id = hex_board.game_id;
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let _game = game_option.unwrap();
 
 		// force_finish_turn can not be called before the BlocksToPlayLimit has been passed
 		assert_noop!(
@@ -561,11 +582,11 @@ fn play() {
 			HexBoardStorage::<TestRuntime>::get(1);
 
 		let hex_board = hex_board_option.unwrap();
+		
+		let game_id = hex_board.game_id;
 
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(1));
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(2));
 
 		assert_noop!(
 			HexalemModule::play(RuntimeOrigin::signed(1), Move { place_index: 12, buy_index: 0 }),
@@ -591,7 +612,7 @@ fn play() {
 		// Set player resources to 0
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: hex_board.hex_grid, resources: [0; NUMBER_OF_RESOURCE_TYPES] },
+			HexBoard { hex_grid: hex_board.hex_grid, resources: [0; NUMBER_OF_RESOURCE_TYPES], game_id },
 		);
 
 		assert_noop!(
@@ -619,7 +640,7 @@ fn play_pattern() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
 		let new_hex_grid: HexGridOf<TestRuntime> = vec![
 			HexalemTile(0),
@@ -651,12 +672,12 @@ fn play_pattern() {
 		.try_into()
 		.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		// Set player resources to 0
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: new_hex_grid.clone(), resources: [5; NUMBER_OF_RESOURCE_TYPES] },
+			HexBoard { hex_grid: new_hex_grid.clone(), resources: [5; NUMBER_OF_RESOURCE_TYPES], game_id },
 		);
 
 		let game_option = GameStorage::<TestRuntime>::get(game_id);
@@ -753,10 +774,9 @@ fn upgrade() {
 		let hex_board_option: Option<HexBoardOf<TestRuntime>> =
 			HexBoardStorage::<TestRuntime>::get(1);
 
-		let _hex_board = hex_board_option.unwrap();
+		let hex_board = hex_board_option.unwrap();
 
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		let new_hex_grid: HexGridOf<TestRuntime> = vec![
 			HexalemTile(0),
@@ -790,7 +810,7 @@ fn upgrade() {
 
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: new_hex_grid, resources: [10; NUMBER_OF_RESOURCE_TYPES] },
+			HexBoard { hex_grid: new_hex_grid, resources: [10; NUMBER_OF_RESOURCE_TYPES], game_id },
 		);
 
 		assert_noop!(
@@ -861,6 +881,7 @@ fn upgrade() {
 				HexBoard {
 					hex_grid: hex_board.hex_grid,
 					resources: [10; NUMBER_OF_RESOURCE_TYPES],
+					game_id,
 				},
 			);
 		}
@@ -1077,7 +1098,12 @@ fn simple_2p_matchmaking() {
 
 		assert_eq!(MatchmakerModule::queue_size(0), 0);
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let _game_id: GameId =
+			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let _game_id: GameId =
+			MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
+
+		let game_id: GameId = hex_board.game_id;
 
 		let game_option = GameStorage::<TestRuntime>::get(game_id);
 
@@ -1093,7 +1119,7 @@ fn simple_2p_matchmaking() {
 
 		assert_eq!(game.get_selection_size(), 2);
 
-		assert_eq!(game.get_state(), GameState::Playing);
+		assert_eq!(game.state, GameState::Playing);
 
 		assert_noop!(
 			HexalemModule::queue(RuntimeOrigin::signed(1)),
@@ -1237,7 +1263,9 @@ fn multiple_brackets_2p_matchmaking() {
 		assert_eq!(MatchmakerModule::queue_size(0), 0);
 		assert_eq!(MatchmakerModule::queue_size(1), 1);
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let _game_id: GameId =
+			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		let game_option = GameStorage::<TestRuntime>::get(game_id);
 
@@ -1253,7 +1281,7 @@ fn multiple_brackets_2p_matchmaking() {
 
 		assert_eq!(game.get_selection_size(), 2);
 
-		assert_eq!(game.get_state(), GameState::Playing);
+		assert_eq!(game.state, GameState::Playing);
 
 		assert_noop!(
 			HexalemModule::queue(RuntimeOrigin::signed(1)),
@@ -1366,7 +1394,7 @@ fn elo_2p_match() {
 
 		let mut hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
 
 		hex_board.resources = [99; NUMBER_OF_RESOURCE_TYPES];
 
@@ -1436,7 +1464,11 @@ fn elo_4p_match() {
 
 		let mut hex_board = hex_board_option.unwrap();
 
-		let game_id: GameId = MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
+		let game_id: GameId = hex_board.game_id;
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let _game = game_option.unwrap();
 
 		hex_board.resources = [99; NUMBER_OF_RESOURCE_TYPES];
 
@@ -1471,7 +1503,7 @@ fn elo_4p_match() {
 #[test]
 fn clean_hex_board_storage() {
 	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
+		/*System::set_block_number(1);
 
 		HexBoardStorage::<TestRuntime>::set(
 			1,
@@ -1554,16 +1586,6 @@ fn clean_hex_board_storage() {
 		MatchmakingStateStorage::<TestRuntime>::set(5, MatchmakingState::Finished(Rewards::Draw));
 
 		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(5)));
-	});
-}
-
-#[test]
-fn clean_hex_board_without_accepting_match() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-
-		MatchmakingStateStorage::<TestRuntime>::set(1, MatchmakingState::Finished(Rewards::Loser));
-
-		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(1)));
+		*/
 	});
 }

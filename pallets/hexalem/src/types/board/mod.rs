@@ -39,6 +39,7 @@ pub type HexGrid<Tile, N> = BoundedVec<Tile, N>;
 pub struct HexBoard<Tile, MaxGridSize> {
 	pub resources: [ResourceUnit; NUMBER_OF_RESOURCE_TYPES],
 	pub hex_grid: HexGrid<Tile, MaxGridSize>, // Board with all tiles
+	pub game_id: GameId,
 }
 
 impl<Tile, MaxGridSize> HexBoard<Tile, MaxGridSize>
@@ -46,7 +47,10 @@ where
 	Tile: Default + Clone + GetTileInfo,
 	MaxGridSize: Get<u32>,
 {
-	pub fn try_new<DefaultPlayerResources>(size: usize) -> Option<HexBoard<Tile, MaxGridSize>>
+	pub fn try_new<DefaultPlayerResources>(
+		game_id: GameId,
+		size: usize,
+	) -> Option<HexBoard<Tile, MaxGridSize>>
 	where
 		DefaultPlayerResources: Get<[ResourceUnit; 7]>,
 	{
@@ -63,6 +67,7 @@ where
 			Some(HexBoard::<Tile, MaxGridSize> {
 				resources: DefaultPlayerResources::get(),
 				hex_grid: new_hex_grid,
+				game_id,
 			})
 		} else {
 			None

@@ -1,12 +1,23 @@
+use frame_support::traits::Get;
 use super::*;
 
-#[derive(Encode, Decode, TypeInfo, MaxEncodedLen, PartialEq, Copy, Clone, Debug)]
-pub enum GameState {
-	Playing,
-	Finished { winner: Option<u8> }, // Ready to reward players
+#[derive(Encode, Decode, TypeInfo, MaxEncodedLen, PartialEq, Clone, Debug)]
+pub enum Rewards {
+	Winner,
+	Loser,
+	Draw,
+	// Other types of rewards
 }
 
-pub trait GameProperties<Account, MaxPlayers> {
+pub type RewardsDistribution<N> = BoundedVec<Rewards, N>;
+
+#[derive(Encode, Decode, TypeInfo, MaxEncodedLen, PartialEq, Clone, Debug)]
+pub enum GameState<MaxPlayers: Get<u32>> {
+	Playing,
+	Finished(RewardsDistribution<MaxPlayers>), // Ready to reward players
+}
+
+pub trait GameProperties<Account, MaxPlayers: Get<u32>> {
 	// Player made a move
 	// It is used for determining whether to generate a new selection
 	fn get_played(&self) -> bool;
@@ -17,9 +28,6 @@ pub trait GameProperties<Account, MaxPlayers> {
 
 	fn get_player_turn(&self) -> u8;
 	fn set_player_turn(&mut self, turn: u8);
-
-	fn get_state(&self) -> GameState;
-	fn set_state(&mut self, state: GameState);
 
 	fn borrow_players(&self) -> &Players<Account, MaxPlayers>;
 
@@ -34,8 +42,8 @@ pub type TileCostIndex = u8;
 pub type TileSelection<N> = BoundedVec<TileCostIndex, N>;
 
 #[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
-pub struct Game<Account, BlockNumber, MaxPlayers, MaxTiles> {
-	pub state: GameState,
+pub struct Game<Account, BlockNumber, MaxPlayers: Get<u32>, MaxTiles> {
+	pub state: GameState<MaxPlayers>,
 	pub player_turn_and_played: u8,
 	pub last_played_block: BlockNumber,
 	pub players: Players<Account, MaxPlayers>, // Player AccountIds
@@ -45,7 +53,7 @@ pub struct Game<Account, BlockNumber, MaxPlayers, MaxTiles> {
 	pub max_rounds: u8,
 }
 
-impl<Account, BlockNumber, MaxPlayers, MaxTiles> GameProperties<Account, MaxPlayers>
+impl<Account, BlockNumber, MaxPlayers: Get<u32>, MaxTiles> GameProperties<Account, MaxPlayers>
 	for Game<Account, BlockNumber, MaxPlayers, MaxTiles>
 {
 	fn get_played(&self) -> bool {
@@ -70,14 +78,6 @@ impl<Account, BlockNumber, MaxPlayers, MaxTiles> GameProperties<Account, MaxPlay
 
 	fn set_player_turn(&mut self, turn: u8) {
 		self.player_turn_and_played = (self.player_turn_and_played & 0x80) | turn;
-	}
-
-	fn get_state(&self) -> GameState {
-		self.state
-	}
-
-	fn set_state(&mut self, state: GameState) {
-		self.state = state;
 	}
 
 	fn borrow_players(&self) -> &Players<Account, MaxPlayers> {
