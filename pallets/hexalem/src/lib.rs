@@ -755,7 +755,7 @@ pub mod pallet {
 
 		#[pallet::call_index(5)]
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
-		pub fn receive_rewards(origin: OriginFor<T>) -> DispatchResult {
+		pub fn claim_rewards(origin: OriginFor<T>) -> DispatchResult {
 			let who: AccountIdOf<T> = ensure_signed(origin)?;
 
 			// Ensures that the HexBoard exists
