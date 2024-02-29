@@ -198,6 +198,7 @@ parameter_types! {
 	pub const HexalemTargetGoalHuman: u8 = 7u8;
 	pub const HexalemMatchmakingPeriod: u32 = 10u32;
 	pub const HexalemMatchingType: MatchingType = MatchingType::Same;
+	pub const HexalemBlocksToClaimCooldown: u8 = 10u8;
 }
 
 // Configure a mock runtime to test the pallet.
@@ -278,6 +279,7 @@ impl pallet_hexalem::Config for TestRuntime {
 	type MatchingType = HexalemMatchingType;
 	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 	type Elo = EloModule;
+	type BlocksToClaimCooldown = HexalemBlocksToClaimCooldown;
 }
 
 // Build genesis storage according to the mock runtime.

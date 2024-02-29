@@ -84,6 +84,9 @@ pub mod pallet {
 		type BlocksToPlayLimit: Get<u8>;
 
 		#[pallet::constant]
+		type BlocksToClaimCooldown: Get<u8>;
+
+		#[pallet::constant]
 		type MaxHexGridSize: Get<u32> + Parameter;
 
 		#[pallet::constant]
@@ -287,6 +290,9 @@ pub mod pallet {
 
 		// Not enough blocks have passed to force finish turn
 		BlocksToPlayLimitNotPassed,
+
+		// Not enough blocks have passed to claim rewards
+		ClaimCooldownNotPassed,
 	}
 
 	#[pallet::hooks]
@@ -772,6 +778,15 @@ pub mod pallet {
 				None => return Err(Error::<T>::GameNotInitialized.into()),
 			};
 
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+			ensure!(
+				game.last_played_block
+					.saturated_into::<u128>()
+					.saturating_add(T::BlocksToClaimCooldown::get() as u128) <
+					current_block_number.saturated_into::<u128>(),
+				Error::<T>::ClaimCooldownNotPassed
+			);
+
 			let rewards = match game.state.clone() {
 				GameStateOf::<T>::Finished(value) => value,
 				_ => return Err(Error::<T>::GameNotInFinishedState.into()),
@@ -791,7 +806,7 @@ pub mod pallet {
 					},
 					Rewards::Loser => {
 						// Handle giving rewards
-					}
+					},
 				};
 			}
 

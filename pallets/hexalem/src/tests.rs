@@ -442,7 +442,12 @@ fn test_game_finishes_on_25th_round_3p() {
 
 		let game = game_option.unwrap();
 
-		assert_eq!(game.state, GameState::Finished(vec![Rewards::Draw, Rewards::Draw, Rewards::Draw].try_into().unwrap()));
+		assert_eq!(
+			game.state,
+			GameState::Finished(
+				vec![Rewards::Draw, Rewards::Draw, Rewards::Draw].try_into().unwrap()
+			)
+		);
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
@@ -511,7 +516,12 @@ fn test_game_force_finishes_on_25th_round_3p() {
 
 		let game = game_option.unwrap();
 
-		assert_eq!(game.state, GameState::Finished(vec![Rewards::Draw, Rewards::Draw, Rewards::Draw].try_into().unwrap()));
+		assert_eq!(
+			game.state,
+			GameState::Finished(
+				vec![Rewards::Draw, Rewards::Draw, Rewards::Draw].try_into().unwrap()
+			)
+		);
 
 		System::assert_has_event(Event::GameFinished { game_id }.into());
 
@@ -582,7 +592,7 @@ fn play() {
 			HexBoardStorage::<TestRuntime>::get(1);
 
 		let hex_board = hex_board_option.unwrap();
-		
+
 		let game_id = hex_board.game_id;
 
 		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(1));
@@ -612,7 +622,11 @@ fn play() {
 		// Set player resources to 0
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: hex_board.hex_grid, resources: [0; NUMBER_OF_RESOURCE_TYPES], game_id },
+			HexBoard {
+				hex_grid: hex_board.hex_grid,
+				resources: [0; NUMBER_OF_RESOURCE_TYPES],
+				game_id,
+			},
 		);
 
 		assert_noop!(
@@ -677,7 +691,11 @@ fn play_pattern() {
 		// Set player resources to 0
 		HexalemModule::set_hex_board(
 			1,
-			HexBoard { hex_grid: new_hex_grid.clone(), resources: [5; NUMBER_OF_RESOURCE_TYPES], game_id },
+			HexBoard {
+				hex_grid: new_hex_grid.clone(),
+				resources: [5; NUMBER_OF_RESOURCE_TYPES],
+				game_id,
+			},
 		);
 
 		let game_option = GameStorage::<TestRuntime>::get(game_id);

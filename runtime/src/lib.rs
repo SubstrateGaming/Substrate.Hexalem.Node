@@ -461,6 +461,7 @@ parameter_types! {
 	pub const HexalemMatchmakingPeriod: u32 = 10u32;
 
 	pub const HexalemMatchingType: MatchingType = MatchingType::Mix;
+	pub const HexalemBlocksToClaimCooldown: u8 = 10u8;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -502,6 +503,8 @@ impl pallet_hexalem::Config for Runtime {
 	type Elo = EloModule;
 	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 	type MatchingType = HexalemMatchingType;
+	type BlocksToClaimCooldown = HexalemBlocksToClaimCooldown;
+
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
