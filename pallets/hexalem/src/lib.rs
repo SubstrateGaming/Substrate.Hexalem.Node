@@ -810,6 +810,8 @@ pub mod pallet {
 				};
 			}
 
+			GameStorage::<T>::remove(game_id);
+
 			Self::deposit_event(Event::RewardsClaimed { player: who });
 
 			Ok(())
