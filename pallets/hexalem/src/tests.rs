@@ -1521,33 +1521,16 @@ fn elo_4p_match() {
 #[test]
 fn clean_hex_board_storage() {
 	new_test_ext().execute_with(|| {
-		/*System::set_block_number(1);
-
-		HexBoardStorage::<TestRuntime>::set(
-			1,
-			Some(
-				HexBoardOf::<TestRuntime>::try_new::<
-					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25)
-				.unwrap(),
-			),
+		assert_noop!(
+			HexalemModule::claim_rewards(RuntimeOrigin::signed(0)),
+			Error::<TestRuntime>::HexBoardNotInitialized
 		);
 
 		MatchmakingStateStorage::<TestRuntime>::set(1, MatchmakingState::Matchmaking);
 
 		assert_noop!(
-			HexalemModule::receive_rewards(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::HexBoardNotInFinishedState
-		);
-
-		HexBoardStorage::<TestRuntime>::set(
-			2,
-			Some(
-				HexBoardOf::<TestRuntime>::try_new::<
-					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25)
-				.unwrap(),
-			),
+			HexalemModule::claim_rewards(RuntimeOrigin::signed(1)),
+			Error::<TestRuntime>::HexBoardNotInitialized
 		);
 
 		MatchmakingStateStorage::<TestRuntime>::set(
@@ -1556,54 +1539,62 @@ fn clean_hex_board_storage() {
 		);
 
 		assert_noop!(
-			HexalemModule::receive_rewards(RuntimeOrigin::signed(2)),
-			Error::<TestRuntime>::HexBoardNotInFinishedState
+			HexalemModule::claim_rewards(RuntimeOrigin::signed(2)),
+			Error::<TestRuntime>::HexBoardNotInitialized
 		);
 
-		HexBoardStorage::<TestRuntime>::set(
-			3,
-			Some(
-				HexBoardOf::<TestRuntime>::try_new::<
-					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25)
-				.unwrap(),
-			),
+		let players = vec![3, 4, 5];
+
+		assert_ok!(HexalemModule::create_game(RuntimeOrigin::signed(3), players.clone(), 25));
+
+		System::set_block_number(10);
+
+		assert_noop!(
+			HexalemModule::claim_rewards(RuntimeOrigin::signed(3)),
+			Error::<TestRuntime>::GameNotInFinishedState
 		);
 
-		MatchmakingStateStorage::<TestRuntime>::set(3, MatchmakingState::Finished(Rewards::Winner));
+		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(3);
 
-		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(3)));
+		let hex_board = hex_board_option.unwrap();
 
-		// Can queue new game
-		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(3)));
+		let game_id: GameId = hex_board.game_id;
 
-		HexBoardStorage::<TestRuntime>::set(
-			4,
-			Some(
-				HexBoardOf::<TestRuntime>::try_new::<
-					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25)
-				.unwrap(),
-			),
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let mut game = game_option.unwrap();
+
+		game.state = GameState::Finished(
+			vec![Rewards::Winner, Rewards::Loser, Rewards::Loser].try_into().unwrap(),
+		);
+		game.last_played_block = 10;
+
+		assert_eq!(
+			game.borrow_players(),
+			&TryInto::<Players<u64, <mock::TestRuntime as pallet::Config>::MaxPlayers>>::try_into(
+				players
+			)
+			.unwrap()
+		);
+		GameStorage::<TestRuntime>::set(game_id, Some(game));
+
+		assert_noop!(
+			HexalemModule::claim_rewards(RuntimeOrigin::signed(3)),
+			Error::<TestRuntime>::ClaimCooldownNotPassed
 		);
 
-		MatchmakingStateStorage::<TestRuntime>::set(4, MatchmakingState::Finished(Rewards::Loser));
+		System::set_block_number(20);
 
-		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(4)));
-
-		HexBoardStorage::<TestRuntime>::set(
-			5,
-			Some(
-				HexBoardOf::<TestRuntime>::try_new::<
-					<mock::TestRuntime as pallet::Config>::DefaultPlayerResources,
-				>(25)
-				.unwrap(),
-			),
+		assert_ok!(HexalemModule::claim_rewards(RuntimeOrigin::signed(3)));
+		assert_noop!(
+			HexalemModule::claim_rewards(RuntimeOrigin::signed(4)),
+			Error::<TestRuntime>::HexBoardNotInitialized,
 		);
 
-		MatchmakingStateStorage::<TestRuntime>::set(5, MatchmakingState::Finished(Rewards::Draw));
-
-		assert_ok!(HexalemModule::receive_rewards(RuntimeOrigin::signed(5)));
-		*/
+		assert!(!GameStorage::<TestRuntime>::contains_key(game_id));
+		assert!(!HexBoardStorage::<TestRuntime>::contains_key(3));
+		assert!(!HexBoardStorage::<TestRuntime>::contains_key(4));
+		assert!(!HexBoardStorage::<TestRuntime>::contains_key(5));
 	});
 }

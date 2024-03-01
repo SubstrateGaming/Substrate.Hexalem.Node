@@ -782,7 +782,7 @@ pub mod pallet {
 			ensure!(
 				game.last_played_block
 					.saturated_into::<u128>()
-					.saturating_add(T::BlocksToClaimCooldown::get() as u128) <
+					.saturating_add(T::BlocksToClaimCooldown::get() as u128) <=
 					current_block_number.saturated_into::<u128>(),
 				Error::<T>::ClaimCooldownNotPassed
 			);
@@ -795,7 +795,7 @@ pub mod pallet {
 			let players = game.borrow_players();
 			for i in 0..players.len() {
 				// Clean the HexBoardStorage
-				MatchmakingStateStorage::<T>::remove(&players[i as usize]);
+				HexBoardStorage::<T>::remove(&players[i as usize]);
 
 				match rewards[i] {
 					Rewards::Winner => {

@@ -504,7 +504,6 @@ impl pallet_hexalem::Config for Runtime {
 	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 	type MatchingType = HexalemMatchingType;
 	type BlocksToClaimCooldown = HexalemBlocksToClaimCooldown;
-
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
