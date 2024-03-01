@@ -14,9 +14,9 @@ pub type MatchAcceptions<N> = BoundedVec<bool, N>;
 
 #[derive(Encode, Decode, TypeInfo, MaxEncodedLen, PartialEq, Clone, Debug)]
 pub enum GameState<MaxPlayers: Get<u32>> {
+	Accepting(MatchAcceptions<MaxPlayers>),
 	Playing,
 	Finished(RewardsDistribution<MaxPlayers>), // Ready to reward players
-	Accepting(MatchAcceptions<MaxPlayers>),
 }
 
 pub trait GameProperties<Account, MaxPlayers: Get<u32>> {
