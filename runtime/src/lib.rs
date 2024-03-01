@@ -334,6 +334,7 @@ parameter_types! {
 	pub const HexalemMaxRounds: u8 = 25;
 
 	pub const HexalemBlocksToPlayLimit: u8 = 10;
+	pub const HexalemBlocksToAcceptMatchLimit: u8 = 5;
 
 	pub const HexalemTileResourceProductions: [ResourceProductions; NUMBER_OF_TILE_TYPES] = [
 		// Empty
@@ -504,6 +505,7 @@ impl pallet_hexalem::Config for Runtime {
 	type MatchmakingPeriod = HexalemMatchmakingPeriod;
 	type MatchingType = HexalemMatchingType;
 	type BlocksToClaimCooldown = HexalemBlocksToClaimCooldown;
+	type BlocksToAcceptMatchLimit = HexalemBlocksToAcceptMatchLimit;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

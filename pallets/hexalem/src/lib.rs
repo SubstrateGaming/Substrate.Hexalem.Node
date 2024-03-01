@@ -84,6 +84,9 @@ pub mod pallet {
 		type BlocksToPlayLimit: Get<u8>;
 
 		#[pallet::constant]
+		type BlocksToAcceptMatchLimit: Get<u8>;
+
+		#[pallet::constant]
 		type BlocksToClaimCooldown: Get<u8>;
 
 		#[pallet::constant]
@@ -270,6 +273,9 @@ pub mod pallet {
 		// Game has not started yet, or has been finished already.
 		GameNotInPlayingState,
 
+		// Game has already started or has been finished already.
+		GameNotInAcceptingState,
+
 		// The grid size is not 9, 25, 49.
 		BadGridSize,
 
@@ -290,6 +296,9 @@ pub mod pallet {
 
 		// Not enough blocks have passed to force finish turn
 		BlocksToPlayLimitNotPassed,
+
+		// Not enough blocks have passed to force accept match
+		BlocksToAcceptMatchLimitNotPassed,
 
 		// Not enough blocks have passed to claim rewards
 		ClaimCooldownNotPassed,
@@ -392,7 +401,7 @@ pub mod pallet {
 			}
 
 			// Default Game Config
-			Self::do_create_new_game(game_id, current_block_number, players, grid_size);
+			Self::do_create_new_game(game_id, current_block_number, players, grid_size, GameStateOf::<T>::Playing);
 
 			Ok(())
 		}
@@ -444,10 +453,43 @@ pub mod pallet {
 				Error::<T>::HexBoardAlreadyInitialized
 			);
 
+			// Ensures that the Game exists
+			let mut game = match GameStorage::<T>::get(game_id) {
+				Some(value) => value,
+				None => return Err(Error::<T>::GameNotInitialized.into()),
+			};
+
+			let mut acceptations = match game.state {
+				GameStateOf::<T>::Accepting(value) => value,
+				_ => return Err(Error::<T>::GameNotInAcceptingState.into()),
+			};
+
+			let potential_players = game.players.clone();
+
+			let mut everyone_accepted = true;
+
+			for i in 0..acceptations.len() {
+				if potential_players[i] == who {
+					acceptations[i] = true;
+				}
+				else if !acceptations[i] {
+					everyone_accepted = false;
+				}
+			}
+
+			if everyone_accepted {
+				let current_block_number = <frame_system::Pallet<T>>::block_number();
+				game.last_played_block = current_block_number;
+				game.state = GameStateOf::<T>::Playing;
+			}
+			else {
+				game.state = GameStateOf::<T>::Accepting(acceptations);
+			}
+
 			// Might be changed
 			let grid_size: u8 = 25;
 
-			HexBoardStorage::<T>::remove(&who);
+			MatchmakingStateStorage::<T>::remove(&who);
 
 			HexBoardStorage::<T>::set(
 				who,
@@ -459,6 +501,58 @@ pub mod pallet {
 					.ok_or(Error::<T>::InternalError)?,
 				),
 			);
+
+			GameStorage::<T>::set(game_id, Some(game));
+
+			Ok(())
+		}
+
+		#[pallet::call_index(102)]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
+		pub fn force_accept_match(origin: OriginFor<T>) -> DispatchResult {
+			let who: AccountIdOf<T> = ensure_signed(origin)?;
+
+			// Ensures that the HexBoard exists
+			let hex_board = match HexBoardStorage::<T>::get(&who) {
+				Some(value) => value,
+				None => return Err(Error::<T>::HexBoardNotInitialized.into()),
+			};
+
+			let game_id: GameId = hex_board.game_id;
+
+			// Ensures that the Game exists
+			let mut game = match GameStorage::<T>::get(game_id) {
+				Some(value) => value,
+				None => return Err(Error::<T>::GameNotInitialized.into()),
+			};
+
+			let acceptations = match game.state {
+				GameStateOf::<T>::Accepting(value) => value,
+				_ => return Err(Error::<T>::GameNotInAcceptingState.into()),
+			};
+
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+
+			ensure!(
+				game.last_played_block
+					.saturated_into::<u128>()
+					.saturating_add(T::BlocksToAcceptMatchLimit::get() as u128) <=
+					current_block_number.saturated_into::<u128>(),
+				Error::<T>::BlocksToAcceptMatchLimitNotPassed
+			);
+
+			let potential_players = game.players.clone();
+
+			for i in 0..acceptations.len() {
+				if !acceptations[i] {
+					MatchmakingStateStorage::<T>::remove(&potential_players[i]);
+				}
+			}
+
+			game.last_played_block = current_block_number;
+			game.state = GameStateOf::<T>::Playing;
+
+			GameStorage::<T>::set(game_id, Some(game));
 
 			Ok(())
 		}
@@ -876,8 +970,12 @@ impl<T: Config> Pallet<T> {
 				MatchmakingStateStorage::<T>::set(player, MatchmakingState::Joined(game_id));
 			}
 
+			let num_of_players = potential_players.len();
+
+			let acceptions: MatchAcceptions<T::MaxPlayers> = vec![false; num_of_players].try_into().unwrap_or_default();
+
 			// Create new game
-			Self::do_create_new_game(game_id, current_block_number, potential_players, grid_size);
+			Self::do_create_new_game(game_id, current_block_number, potential_players, grid_size, GameStateOf::<T>::Accepting(acceptions));
 
 			// Maybe adjust the weight
 		}
@@ -889,13 +987,14 @@ impl<T: Config> Pallet<T> {
 		current_block_number: BlockNumberFor<T>,
 		players: Vec<AccountIdOf<T>>,
 		grid_size: u8,
+		state: GameStateOf<T>,
 	) {
 		//let game_players: Players<Account, MaxPlayers> = .//.map_err(|_|
 		// Error::<T>::InternalError)?;
 
 		// Default Game Config
 		let mut game = Game {
-			state: GameStateOf::<T>::Playing,
+			state,
 			selection_size: 2,
 			round: 0,
 			max_rounds: T::MaxRounds::get(),

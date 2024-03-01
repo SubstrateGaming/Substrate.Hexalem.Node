@@ -1066,7 +1066,7 @@ fn simple_2p_matchmaking() {
 
 		assert_noop!(
 			HexalemModule::accept_match(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::HexBoardAlreadyInitialized
+			Error::<TestRuntime>::DidNotJoinGame
 		);
 
 		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
@@ -1110,16 +1110,10 @@ fn simple_2p_matchmaking() {
 		.unwrap();
 		assert_eq!(hex_board.hex_grid, default_hex_grid);
 
-		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(2);
-
-		assert_ne!(matchmaking_state, MatchmakingState::Matchmaking);
-
 		assert_eq!(MatchmakerModule::queue_size(0), 0);
 
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(2).get_game_id().unwrap();
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(1));
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(2));
 
 		let game_id: GameId = hex_board.game_id;
 
@@ -1230,7 +1224,7 @@ fn multiple_brackets_2p_matchmaking() {
 
 		assert_noop!(
 			HexalemModule::accept_match(RuntimeOrigin::signed(1)),
-			Error::<TestRuntime>::HexBoardAlreadyInitialized
+			Error::<TestRuntime>::DidNotJoinGame
 		);
 
 		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
@@ -1281,8 +1275,6 @@ fn multiple_brackets_2p_matchmaking() {
 		assert_eq!(MatchmakerModule::queue_size(0), 0);
 		assert_eq!(MatchmakerModule::queue_size(1), 1);
 
-		let _game_id: GameId =
-			MatchmakingStateStorage::<TestRuntime>::get(1).get_game_id().unwrap();
 		let game_id: GameId = hex_board.game_id;
 
 		let game_option = GameStorage::<TestRuntime>::get(game_id);
