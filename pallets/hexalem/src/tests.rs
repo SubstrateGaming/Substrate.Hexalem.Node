@@ -1590,3 +1590,58 @@ fn clean_hex_board_storage() {
 		assert!(!HexBoardStorage::<TestRuntime>::contains_key(5));
 	});
 }
+
+#[test]
+fn force_accept_match() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(1)));
+		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(2)));
+		
+		System::set_block_number(10);
+		HexalemModule::on_initialize(10);
+
+		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
+
+		let game_id = match matchmaking_state {
+			MatchmakingState::Joined(value) => value,
+			_ => panic!(),
+		};
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let game = game_option.unwrap();
+
+		let expected_players: Players<u64, <mock::TestRuntime as pallet::Config>::MaxPlayers> = vec![1, 2].try_into().unwrap();
+
+		assert_eq!(game.state, GameState::Accepting(vec![false, false].try_into().unwrap()));
+		assert_eq!(game.players, expected_players);
+
+		assert_ok!(HexalemModule::accept_match(RuntimeOrigin::signed(1)));
+
+		assert!(MatchmakingStateStorage::<TestRuntime>::contains_key(2));
+
+		System::set_block_number(15);
+
+		assert_ok!(HexalemModule::force_accept_match(RuntimeOrigin::signed(1)));
+
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(1));
+		assert!(!MatchmakingStateStorage::<TestRuntime>::contains_key(2));
+		assert!(HexBoardStorage::<TestRuntime>::contains_key(1));
+		assert!(!HexBoardStorage::<TestRuntime>::contains_key(2));
+
+		let hex_board_option: Option<crate::HexBoardOf<TestRuntime>> =
+			HexBoardStorage::<TestRuntime>::get(1);
+
+		let hex_board = hex_board_option.unwrap();
+
+		let game_id: GameId = hex_board.game_id;
+
+		let game_option = GameStorage::<TestRuntime>::get(game_id);
+
+		let game = game_option.unwrap();
+
+		let expected_players: Players<u64, <mock::TestRuntime as pallet::Config>::MaxPlayers> = vec![1].try_into().unwrap();
+		assert_eq!(game.state, GameState::Playing);
+		assert_eq!(game.players, expected_players);
+	});
+}

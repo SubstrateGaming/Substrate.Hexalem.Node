@@ -88,6 +88,23 @@ impl<T: Config> Pallet<T> {
 		});
 	}
 
+	fn do_lose_rating(
+		player: &AccountIdOf<T>,
+		amount: Rating,
+	) {
+		let rating: Rating = RatingStorage::<T>::get(player);
+
+		let new_rating = rating.saturating_sub(amount);
+
+		RatingStorage::<T>::set(player, new_rating);
+
+		Self::deposit_event(Event::RatingLost {
+			player: player.clone(),
+			new_rating,
+			rating_lost: amount,
+		});
+	}
+
 	fn do_update_ratings(
 		winner: &AccountIdOf<T>,
 		losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>,
@@ -176,6 +193,10 @@ impl<T: Config> EloFunc<AccountIdOf<T>, <T as Config>::MaxPlayers> for Pallet<T>
 		Self::do_update_rating(winner, loser)
 	}
 
+	fn lose_rating(player: &AccountIdOf<T>, amount: Rating) {
+		Self::do_lose_rating(player, amount);
+	}
+
 	fn update_ratings(
 		winner: &AccountIdOf<T>,
 		losers: &BoundedVec<AccountIdOf<T>, <T as Config>::MaxPlayers>,
@@ -190,6 +211,8 @@ impl<T: Config> EloFunc<AccountIdOf<T>, <T as Config>::MaxPlayers> for Pallet<T>
 
 pub trait EloFunc<AccountId, MaxAccounts> {
 	fn update_rating(winner: &AccountId, loser: &AccountId);
+
+	fn lose_rating(player: &AccountId, amount: Rating);
 
 	fn update_ratings(winner: &AccountId, losers: &BoundedVec<AccountId, MaxAccounts>);
 

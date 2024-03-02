@@ -542,15 +542,22 @@ pub mod pallet {
 			);
 
 			let potential_players = game.players.clone();
+			let mut real_players: Vec<AccountIdOf<T>> = Vec::new();
 
 			for i in 0..acceptations.len() {
-				if !acceptations[i] {
+				if acceptations[i] {
+					real_players.push(potential_players[i].clone());
+				}
+				else {
 					MatchmakingStateStorage::<T>::remove(&potential_players[i]);
+
+					T::Elo::lose_rating(&potential_players[i], 20);
 				}
 			}
 
 			game.last_played_block = current_block_number;
 			game.state = GameStateOf::<T>::Playing;
+			game.players = real_players.try_into().unwrap_or_default();
 
 			GameStorage::<T>::set(game_id, Some(game));
 
