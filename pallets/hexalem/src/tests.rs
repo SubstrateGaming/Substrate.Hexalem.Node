@@ -1594,11 +1594,20 @@ fn clean_hex_board_storage() {
 #[test]
 fn force_accept_match() {
 	new_test_ext().execute_with(|| {
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(1)), Error::<TestRuntime>::HexBoardNotInitialized);
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInitialized);
+
 		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(1)));
 		assert_ok!(HexalemModule::queue(RuntimeOrigin::signed(2)));
 		
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(1)), Error::<TestRuntime>::HexBoardNotInitialized);
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInitialized);
+
 		System::set_block_number(10);
 		HexalemModule::on_initialize(10);
+
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(1)), Error::<TestRuntime>::HexBoardNotInitialized);
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInitialized);
 
 		let matchmaking_state = MatchmakingStateStorage::<TestRuntime>::get(1);
 
@@ -1616,6 +1625,7 @@ fn force_accept_match() {
 		assert_eq!(game.state, GameState::Accepting(vec![false, false].try_into().unwrap()));
 		assert_eq!(game.players, expected_players);
 
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInitialized);
 		assert_ok!(HexalemModule::accept_match(RuntimeOrigin::signed(1)));
 
 		assert!(MatchmakingStateStorage::<TestRuntime>::contains_key(2));
@@ -1643,5 +1653,8 @@ fn force_accept_match() {
 		let expected_players: Players<u64, <mock::TestRuntime as pallet::Config>::MaxPlayers> = vec![1].try_into().unwrap();
 		assert_eq!(game.state, GameState::Playing);
 		assert_eq!(game.players, expected_players);
+
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(1)), Error::<TestRuntime>::GameNotInAcceptingState);
+		assert_noop!(HexalemModule::force_accept_match(RuntimeOrigin::signed(2)), Error::<TestRuntime>::HexBoardNotInitialized);
 	});
 }
